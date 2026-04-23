@@ -44,6 +44,7 @@ agent-monitor/    → Claude Code agent dashboard scripts (~/.local/bin/)
 | `nvim/lua/*` | `~/.config/nvim/lua/*` |
 | `nvim/.stylua.toml` | `~/.config/nvim/.stylua.toml` |
 | `nano/nanorc` | `~/.nanorc` |
+| `nano/typescript.nanorc` | `~/.nano/typescript.nanorc` |
 | `tmux/tmux.conf` | `~/.config/tmux/tmux.conf` |
 | `tmux/tmux-cheatsheet` | `~/.config/tmux/tmux-cheatsheet` |
 | `agent-monitor/claude-dashboard` | `~/.local/bin/claude-dashboard` |

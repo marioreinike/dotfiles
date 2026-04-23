@@ -15,7 +15,7 @@ set wordchars "_"
 set stateflags
 set indicator
 set minibar
-set nohelp
+unset nohelp
 set softwrap
 set atblanks
 
@@ -42,3 +42,4 @@ set minicolor #abb,#223
 
 # ─── Syntax Highlighting ─────────────────────────────────────────
 include "/opt/homebrew/share/nano/*.nanorc"
+include "~/.nano/typescript.nanorc"

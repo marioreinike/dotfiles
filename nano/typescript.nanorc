@@ -1,0 +1,45 @@
+## Syntax highlighting for TypeScript / TSX.
+## Uses One Dark palette (3-digit hex) consistent with nanorc theme.
+
+syntax typescript "\.(m?ts|tsx)$"
+comment "//"
+
+# Types & type-related keywords (yellow).
+color #ec7 "\<(any|boolean|never|null|number|object|string|symbol|undefined|unknown|void|bigint)\>"
+color #ec7 "\<(type|interface|enum|namespace|module|declare|abstract|readonly|keyof|infer|is|satisfies|as)\>"
+
+# Declarational stuff (green).
+color #9c7 "\<(async|class|const|extends|function|implements|let|this|typeof|var|public|private|protected|static|override|get|set|constructor)\>"
+
+# Flow control (magenta/red).
+color #c7d "\<(do|while|if|else|switch|case|default|for|each|in|of|with)\>"
+color #c7d "\<(await|export|import|from|throw|try|catch|finally|new|delete)\>"
+
+# "Exit" points (red).
+color #e67 "\<(break|continue|return|yield)\>"
+
+# Numbers (cyan).
+color #5bc "\<([0-9]+(\.[0-9]+)?|0x[[:xdigit:]]+|0b[01]+|0o[0-7]+)n?\>"
+# Special values (cyan).
+color #5bc "\<(true|false|null|undefined|NaN|Infinity)\>"
+
+# Decorators (blue).
+color #6af "@[a-zA-Z_][a-zA-Z0-9_]*"
+
+# Strings & template literals (magenta).
+color #c7d ""([^"\]|\\.)*"|'([^'\]|\\.)*'|`([^`\]|\\.)*`"
+# Template literal ${...} interpolation hint (blue).
+color #6af "\$\{[^}]*\}"
+
+# Regex literals (magenta, coarse approximation).
+color #c7d "/[^/*][^/]*/[gimsuy]*"
+
+# Comments (gutter grey).
+color #556 "(^|[[:blank:]])//.*"
+color #556 start="/\*" end="\*/"
+
+# JSDoc tags inside block comments (yellow).
+color #ec7 "@(param|returns?|throws?|example|see|deprecated|type|typedef|property|callback|template|public|private|protected|readonly|override)\>"
+
+# Trailing whitespace.
+color ,#e67 "[[:space:]]+$"
