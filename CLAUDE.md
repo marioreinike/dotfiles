@@ -94,6 +94,7 @@ agent-monitor/    → Claude Code agent dashboard scripts (~/.local/bin/)
 
 **User-level skills** (backed up in `claude-local/skills/`, synced to `~/.claude/skills/`):
 - `/tmux` — Inspect tmux environment: list panes, read output, send commands, create panes/windows/sessions
+- `/metabase` — Query Vambe production data (backend Postgres + apollo Mongo) via Metabase MCP. Auto-invokes when a question could be answered with prod data; gates the MCP behind one-time per-session approval.
 
 When Mario asks to create global skills, save them to both `~/.claude/skills/<name>/SKILL.md` and `claude-local/skills/<name>/SKILL.md`.
 
