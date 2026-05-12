@@ -9,6 +9,17 @@ allowed-tools: Read, Edit, Write, Bash, Glob, Grep
 
 Create and edit Claude Code skills following best practices.
 
+## Before you start — verify the format is current
+
+The skill format (frontmatter fields, file layout, invocation rules) evolves with Claude Code releases. The summary below is a snapshot, not the source of truth. **Before authoring or substantially editing a skill, confirm the current format against the official docs.** Pick whichever applies:
+
+1. **Preferred — spawn the `claude-code-guide` agent** with a focused question like *"What is the current SKILL.md frontmatter schema and the rules for auto-invocation? Cite the docs."* That agent has WebFetch + WebSearch and is purpose-built for Claude Code feature questions.
+2. **Or WebFetch directly** from `https://docs.claude.com/en/docs/claude-code/skills` (and the agent-skills overview page it links to) if you only need a quick lookup.
+
+Skip this step only for trivial wording tweaks where the frontmatter is not changing.
+
+If the docs and this SKILL.md disagree, trust the docs and update this file afterwards.
+
 ## Skill structure
 
 Every skill lives in a directory with at least a `SKILL.md`:
