@@ -9,7 +9,10 @@
     "args": [
       "-y",
       "@playwright/mcp@latest",
-      "--headless",
+      "--browser",
+      "chrome",
+      "--user-data-dir",
+      "/Users/mario/.cache/playwright-mcp-profile",
       "--caps",
       "pdf,vision"
     ],

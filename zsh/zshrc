@@ -166,3 +166,6 @@ alias cla="claude --enable-auto-mode"
 alias clb="claude --dangerously-skip-permissions"
 alias cld="cd ~/REPOS/dotfiles && claude --dangerously-skip-permissions"
 alias dotfiles="cd ~/REPOS/dotfiles"
+
+# Launch Chrome with remote-debugging-port so the Playwright MCP can attach via CDP.
+alias chrome-debug="/Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome --remote-debugging-port=9222"
