@@ -42,8 +42,18 @@ case "$event" in
     ;;
 esac
 
-# Get TTY of current process (inherited from Claude)
-agent_tty=$(ps -o tty= -p $$ 2>/dev/null | tr -d ' ')
-[ -z "$agent_tty" ] || [ "$agent_tty" = "??" ] && exit 0
+# Walk up parent processes to find the claude process's TTY.
+# Hooks are spawned without a controlling terminal, so $$ reports "??".
+agent_tty=""
+pid=$PPID
+for _ in 1 2 3 4 5 6; do
+  [ -z "$pid" ] || [ "$pid" = "1" ] && break
+  t=$(ps -o tty= -p "$pid" 2>/dev/null | tr -d ' ')
+  if [ -n "$t" ] && [ "$t" != "?" ] && [ "$t" != "??" ]; then
+    agent_tty="$t"; break
+  fi
+  pid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')
+done
+[ -z "$agent_tty" ] && exit 0
 
 printf '%s\n%s\n' "$state" "$agent_tty" > "$STATE_DIR/$session_id"
