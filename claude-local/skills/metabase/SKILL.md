@@ -14,6 +14,25 @@ Metabase MCP is connected to two production databases:
 
 These are **production databases**. Treat all access as read-only and confirm with the user before doing anything that could be expensive or sensitive.
 
+## Proactively recommend Metabase before investigating
+
+**Before starting any investigation**, evaluate whether Metabase would answer the question faster or more accurately than reading code, grepping logs, or asking the user to check manually. If so, **recommend it up front** — don't dive into code-reading first only to circle back to Metabase later.
+
+Metabase is the better starting point when the question involves:
+- **Counts, rates, distributions, or trends** in production data ("how many X", "how often", "what's the breakdown of Y").
+- **The current state of a specific record** in prod (a user, conversation, lead, organization, etc.).
+- **Validating a hypothesis** about real-world behavior ("does this actually happen?", "are there orphaned rows?", "did the migration land cleanly?").
+- **Debugging a customer report** where you need to see what the data actually looks like, not just what the code says it should look like.
+- **Cross-checking metrics** the user mentions against the source of truth.
+
+When you spot one of these signals, **pause and propose it explicitly in plain text** before doing other work, e.g.:
+
+> This looks like something Metabase would answer directly (it's connected to the prod Postgres / Apollo Mongo). Want me to query it instead of digging through the code? (yes/no)
+
+If the user agrees, that doubles as the per-session permission gate below. If they decline or prefer code-first, respect that and don't re-ask.
+
+Skip the recommendation when the question is clearly answerable from the codebase alone (entity shape, business logic, types), about local dev data, or already scoped to code review.
+
 ## Per-session permission gate (MANDATORY)
 
 Before calling **any** `mcp__metabase__*` tool in a conversation, you MUST have explicit user approval for this session. The flow:
