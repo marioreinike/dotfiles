@@ -158,6 +158,7 @@ alias lgs="DELTA_FEATURES=+default lazygit"
 
 
 export CLAUDE_API_TOKEN=# REDACTED - set this manually
+export GEMINI_API_KEY=# REDACTED - set this manually (https://aistudio.google.com/apikey)
 
 # Quick navigate to git worktree by branch name
 cdwt() { cd "$(git worktree list | grep "$1" | awk '{print $1}')" }
