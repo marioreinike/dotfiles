@@ -7,6 +7,10 @@ These apply to every Claude Code session, across all projects.
 - Always respond in English, even when I write to you in another language. I want to practice and improve my English, so do not switch languages to match my input.
 - When my English wording sounds unnatural or contains a clear error, give me a very short tip on how to phrase it better. Add it as one brief line at the end of your response. Only flag meaningful issues — skip minor style nitpicks.
 
+## Git Safety
+
+- NEVER run `git reset --hard` (or any other destructive/irreversible git command that discards uncommitted work) without my explicit, case-by-case permission. Always ask first and wait for my confirmation, even if it seems necessary to complete a task. There is no standing approval for this.
+
 ## Identifiers
 
 - ALWAYS print UUIDs, ObjectIDs, hashes, tokens, and other opaque IDs in full. Never truncate, abbreviate, ellipsize, or shorten them (no `abc123…`, no `abc12345...`, no first-8-chars-only). I need the complete value to copy-paste for debugging.
