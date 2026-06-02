@@ -20,7 +20,12 @@ fmt_tokens() {
   fi
 }
 PCT=$(echo "$input" | jq -r '.context_window.used_percentage // 0' | cut -d. -f1)
-TEXT="📁 ${DIR/#$HOME/\~} [$MODEL] Context: $(fmt_tokens "$USED") / $(fmt_tokens "$TOTAL") (${PCT}%)"
+case "$DIR" in
+  "$HOME") DISPLAY_DIR="~" ;;
+  "$HOME"/*) DISPLAY_DIR="~${DIR#$HOME}" ;;
+  *) DISPLAY_DIR="$DIR" ;;
+esac
+TEXT="📁 ${DISPLAY_DIR} [$MODEL] Context: $(fmt_tokens "$USED") / $(fmt_tokens "$TOTAL") (${PCT}%)"
 if [ "$USED" -ge 250000 ]; then
   echo -e "\033[31m${TEXT}\033[0m"
 else
