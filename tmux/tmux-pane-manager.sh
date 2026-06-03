@@ -32,21 +32,23 @@ list_panes() {
   local raw=()
   while IFS= read -r line; do
     raw+=("$line")
-  done < <(tmux list-panes -a -F '#{pane_id}|#{session_name}|#{window_name}|#{pane_index}|#{pane_current_command}|#{pane_current_path}|#{pane_tty}' 2>/dev/null)
+  done < <(tmux list-panes -a -F '#{pane_id}|#{session_name}|#{window_name}|#{pane_index}|#{pane_current_command}|#{pane_current_path}|#{pane_tty}|#{pane_title}' 2>/dev/null)
 
   local prev_group="" total=${#raw[@]}
 
   for i in "${!raw[@]}"; do
-    IFS='|' read -r pid sess win idx cmd path tty <<< "${raw[$i]}"
+    IFS='|' read -r pid sess win idx cmd path tty title <<< "${raw[$i]}"
     local group="$sess:$win"
     local short="${path/#$HOME/\~}"
     local tty_short="${tty#/dev/}"
+    # Guard fzf's |-delimited field parsing against a stray | in the title
+    title="${title//|/ }"
 
     # Lookahead: is next pane in same window?
     local next_same=0
     if [ $((i + 1)) -lt "$total" ]; then
       local nsess nwin
-      IFS='|' read -r _ nsess nwin _ _ _ _ <<< "${raw[$((i+1))]}"
+      IFS='|' read -r _ nsess nwin _ _ _ _ _ <<< "${raw[$((i+1))]}"
       [ "$nsess:$nwin" = "$group" ] && next_same=1
     fi
 
@@ -76,11 +78,11 @@ list_panes() {
         idle)     label="○ idle";     color="\033[38;5;208m" ;;
         *)        label="claude";     color="\033[2m" ;;
       esac
-      printf '%s|  %b%-*s  %-16s  %s\033[0m\n' "$pid" "$color" "$loc_pad" "$loc" "($label)" "$short"
+      printf '%s|  %b%-*s  %-16s  %-22s  %s\033[0m\n' "$pid" "$color" "$loc_pad" "$loc" "($label)" "$short" "$title"
     elif echo "$cmd" | grep -qE '^(zsh|bash|fish|sh)$'; then
-      printf '%s|  \033[2m%-*s  %-16s  %s\033[0m\n' "$pid" "$loc_pad" "$loc" "$cmd" "$short"
+      printf '%s|  \033[2m%-*s  %-16s  %-22s  %s\033[0m\n' "$pid" "$loc_pad" "$loc" "$cmd" "$short" "$title"
     else
-      printf '%s|  \033[1m%-*s  %-16s  %s\033[0m\n' "$pid" "$loc_pad" "$loc" "$cmd" "$short"
+      printf '%s|  \033[1m%-*s  %-16s  %-22s  %s\033[0m\n' "$pid" "$loc_pad" "$loc" "$cmd" "$short" "$title"
     fi
 
     prev_group="$group"
@@ -117,7 +119,7 @@ selected=$(list_panes | fzf \
   --with-nth=2 \
   --nth=1 \
   --preview='tmux capture-pane -p -t {1} 2>/dev/null | tail -30' \
-  --preview-window='right:50%:wrap' \
+  --preview-window='down:50%:wrap' \
   --bind="x:execute-silent(tmux send-keys -t {1} C-c)+reload(bash $SELF --list)" \
   --ansi \
   --no-sort \

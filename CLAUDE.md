@@ -47,6 +47,7 @@ agent-monitor/    → Claude Code agent dashboard scripts (~/.local/bin/)
 | `nano/typescript.nanorc` | `~/.nano/typescript.nanorc` |
 | `tmux/tmux.conf` | `~/.config/tmux/tmux.conf` |
 | `tmux/tmux-cheatsheet` | `~/.config/tmux/tmux-cheatsheet` |
+| `tmux/tmux-pane-manager.sh` | `~/.config/tmux/tmux-pane-manager.sh` |
 | `agent-monitor/claude-dashboard` | `~/.local/bin/claude-dashboard` |
 | `agent-monitor/claude-notify` | `~/.local/bin/claude-notify` |
 | `agent-monitor/claude-state-hook` | `~/.local/bin/claude-state-hook` |
