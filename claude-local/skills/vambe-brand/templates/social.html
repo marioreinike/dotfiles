@@ -1,0 +1,382 @@
+<!-- VAMBE:SOCIAL -->
+<!DOCTYPE html>
+<!--
+  ╔══════════════════════════════════════════════════════════════╗
+  ║  VAMBE BRAND — Template SOCIAL                              ║
+  ║  Uso: posts IG, LinkedIn, stories, carruseles, infografías  ║
+  ║  Canvas: 1080px ancho × alto fijo según formato             ║
+  ║  Export: python render.py este-archivo.html --tipo social   ║
+  ╚══════════════════════════════════════════════════════════════╝
+
+  FORMATOS DISPONIBLES (pasar con --formato al render):
+    4x5       → 1080 × 1350px  IG feed estándar       (default)
+    cuadrado  → 1080 × 1080px  IG / LinkedIn cuadrado
+    story     → 1080 × 1920px  IG / WhatsApp story
+    banner    → 1584 ×  396px  LinkedIn banner
+    wide      → 1080 ×  566px  LinkedIn post wide
+
+  INSTRUCCIONES PARA CLAUDE:
+  1. Copia este archivo y renómbralo
+  2. Elige el modo de fondo activando UNA de las clases en .canvas:
+       .bg-light      → gradiente azul suave (más frecuente)
+       .bg-light-blob → gradiente + blob sutil en esquina
+       .bg-dark       → oscuro con blob (dramático)
+       .bg-white      → blanco puro
+  3. Activa la variante de alto correcta en .canvas cambiando --canvas-h
+  4. Rellena las zonas marcadas con <!-- CONTENIDO: ... -->
+  5. Ejecuta: python vambe-brand/scripts/render.py archivo.html --tipo social --formato 4x5
+
+  ÁREAS DISPONIBLES:
+    .logo-area      → logo arriba (siempre presente, no mover)
+    .tag-area       → tag de categoría (opcional, bajo el logo)
+    .content-area   → zona principal de contenido (libre)
+    .bottom-area    → zona inferior: slogan, CTA, indicador
+
+  MODOS DE SUPERFICIE:
+    Light (default): fondo .bg-light, texto --blue-950, acento --blue-500
+    Dark:            fondo .bg-dark,  texto white,      acento --blue-450
+
+  TIPOGRAFÍA EN SOCIAL (canvas 1080px):
+    Eyebrow:  27px, SemiBold, MAYÚSCULAS + tracking
+    Body:     35–42px, Regular/Medium
+    Subhead:  55–65px, Bold
+    Headline: 80–100px, ExtraBold
+    Hero:     130–200px, ExtraBold (cifra protagonista)
+    Authentic: mismo tamaño que el titular que acompaña, 1 palabra
+-->
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Vambe — Social</title>
+  <style>
+
+    /* ── Fuentes ─────────────────────────────────────────────────── */
+    @font-face {
+      font-family: 'Authentic';
+      src: url(data:font/ttf;base64,AUTHENTIC_B64) format('truetype');
+      font-weight: normal; font-style: normal; font-display: swap;
+    }
+    @font-face {
+      font-family: 'Plus Jakarta Sans';
+      src: url(data:font/ttf;base64,PLUSJAKARTA_B64) format('truetype');
+      font-weight: 100 900; font-style: normal; font-display: swap;
+    }
+    @font-face {
+      font-family: 'Plus Jakarta Sans';
+      src: url(data:font/ttf;base64,PLUSJAKARTA_ITALIC_B64) format('truetype');
+      font-weight: 100 900; font-style: italic; font-display: swap;
+    }
+
+    /* ── Tokens ──────────────────────────────────────────────────── */
+    :root {
+      --blue-950: #0A1C43;
+      --blue-500: #437AEF;
+      --blue-450: #5A8CF6;
+      --blue-300: #88ACFC;
+      --blue-75:  #E1EAFE;
+      --blue-50:  #F2F6FE;
+      --blue-25:  #F5F8FF;
+      --slate-950: #020617;
+      --slate-700: #334155;
+      --slate-600: #475569;
+      --slate-500: #64748B;
+      --slate-200: #D8E0EA;
+      --font:   'Plus Jakarta Sans', sans-serif;
+      --script: 'Authentic', cursive;
+      --sq: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20131%20131%27%3E%3Cpath%20d%3D%27M65.2772%20130.554C53.4138%20130.554%2041.7721%20129.631%2032.5031%20127.948C21.8097%20126.01%2014.5603%20123.202%2010.9562%20119.598C7.35199%20115.994%204.54421%20108.745%202.60667%2098.0512C0.927737%2088.7781%200%2077.1405%200%2065.2771C0%2053.4138%200.923632%2041.7721%202.60667%2032.5031C4.54421%2021.8097%207.35199%2014.5603%2010.9562%2010.9562C14.5603%207.35199%2021.8097%204.5442%2032.5031%202.60665C41.7762%200.927722%2053.4138%200%2065.2772%200C77.1405%200%2088.7822%200.923617%2098.0512%202.60665C108.745%204.5442%20115.994%207.35199%20119.598%2010.9562C123.202%2014.5603%20126.01%2021.8097%20127.948%2032.5031C129.627%2041.7762%20130.554%2053.4138%20130.554%2065.2771C130.554%2077.1405%20129.631%2088.7822%20127.948%2098.0512C126.01%20108.745%20123.202%20115.994%20119.598%20119.598C115.994%20123.202%20108.745%20126.01%2098.0512%20127.948C88.7781%20129.627%2077.1405%20130.554%2065.2772%20130.554Z%27%20fill%3D%27%23ffffff%27/%3E%3C/svg%3E");
+      /* Canvas */
+      --canvas-w: 1080px;
+      --canvas-h: 1350px;   /* ← cambiar según formato: 1350 | 1080 | 1920 | 396 | 566 */
+      --margin:   65px;     /* margen uniforme del área segura */
+      --logo-h:   45px;     /* altura fija del logo (spec de marca) */
+    }
+
+    /* ── Reset ───────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    /* Normalize de display (robustez de render en cualquier motor) */
+    head, title, meta, style, script, link { display: none !important; }
+    div, section, header, footer, main, article, nav, h1, h2, h3, h4, p, blockquote, hr { display: block; }
+    html, body { width: var(--canvas-w); height: var(--canvas-h); overflow: hidden;
+      font-family: var(--font); -webkit-font-smoothing: antialiased; }
+
+    /* ── Canvas principal ────────────────────────────────────────── */
+    .canvas {
+      width: var(--canvas-w);
+      height: var(--canvas-h);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      /* Activa uno de los fondos de abajo: */
+    }
+
+    /* ── Fondos ──────────────────────────────────────────────────── */
+    .bg-light {
+      background: linear-gradient(135deg, #F5F8FF 0%, #E2EAFF 100%);
+    }
+    .bg-light-blob {
+      background:
+        radial-gradient(62% 60% at 90% 4%, rgba(0,106,255,.30) 0%, rgba(0,106,255,.10) 34%, rgba(0,106,255,0) 65%),
+        linear-gradient(135deg, #F5F8FF 0%, #E2EAFF 100%);
+    }
+    .bg-light-blob-left {
+      background:
+        radial-gradient(62% 60% at 10% 4%, rgba(0,106,255,.30) 0%, rgba(0,106,255,.10) 34%, rgba(0,106,255,0) 65%),
+        linear-gradient(135deg, #F5F8FF 0%, #E2EAFF 100%);
+    }
+    .bg-dark {
+      background:
+        radial-gradient(62% 60% at 90% 4%, rgba(0,106,255,.40) 0%, rgba(0,106,255,.16) 34%, rgba(0,106,255,0) 65%),
+        linear-gradient(135deg, #080E1C 0%, #0F1A33 100%);
+    }
+    .bg-dark-left {
+      background:
+        radial-gradient(62% 60% at 10% 4%, rgba(0,106,255,.40) 0%, rgba(0,106,255,.16) 34%, rgba(0,106,255,0) 65%),
+        linear-gradient(135deg, #080E1C 0%, #0F1A33 100%);
+    }
+    .bg-white { background: #FFFFFF; }
+
+    /* ── Área segura (todo el contenido vive aquí) ───────────────── */
+    .safe {
+      position: absolute;
+      inset: var(--margin);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Logo area (siempre arriba izquierda dentro del safe) ────── */
+    .logo-area {
+      height: var(--logo-h);
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+      margin-bottom: 28px;
+    }
+    .logo-area img, .logo-area svg { height: var(--logo-h); width: auto; }
+
+    /* ── Tag de categoría (opcional, bajo el logo) ───────────────── */
+    .tag-area {
+      margin-bottom: 24px;
+      flex-shrink: 0;
+    }
+
+    /* ── Zona de contenido principal ─────────────────────────────── */
+    .content-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;   /* centrado vertical por defecto — ajustar si se necesita */
+    }
+
+    /* ── Zona inferior (slogan, CTA, indicador de slide) ─────────── */
+    .bottom-area {
+      flex-shrink: 0;
+      margin-top: 20px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+    }
+
+    /* ── Tipografía social ───────────────────────────────────────── */
+    /* Usar tamaños inline según la jerarquía de cada pieza.
+       Estos son helpers de uso frecuente: */
+    .t-eyebrow {
+      font-size: 27px; font-weight: 600;
+      letter-spacing: .1em; text-transform: uppercase;
+    }
+    .t-body    { font-size: 38px; font-weight: 400; line-height: 1.5; }
+    .t-subhead { font-size: 58px; font-weight: 700; line-height: 1.2; }
+    .t-headline{ font-size: 88px; font-weight: 800; line-height: 1.1; }
+    .t-hero    { font-size: 160px; font-weight: 800; line-height: .95; }
+
+    /* Colores de texto por modo — aplicar en línea o como clase */
+    .on-light  { color: var(--blue-950); }
+    .on-light .secondary { color: var(--slate-600); }
+    .on-dark   { color: #FFFFFF; }
+    .on-dark .secondary  { color: var(--blue-300); }
+
+    .auth  { font-family: var(--script); font-weight: 400; }
+    .hl    { color: var(--blue-500); }           /* acento sobre fondo claro */
+    .hl-d  { color: var(--blue-450); }           /* acento sobre fondo oscuro */
+
+    /* ── Cards y componentes ─────────────────────────────────────── */
+    .card {
+      background: white; border: 1px solid var(--slate-200);
+      border-radius: 20px; padding: 32px;
+      box-shadow: 0 4px 24px rgba(10,28,67,.08);
+    }
+    .card-dark {
+      background: rgba(255,255,255,.07);
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 20px; padding: 32px;
+    }
+
+    /* Métrica grande */
+    .metric-hero {
+      display: flex; flex-direction: column; align-items: flex-start;
+    }
+    .metric-hero .num {
+      font-size: 140px; font-weight: 800; line-height: .9;
+      letter-spacing: -.03em;
+    }
+    .metric-hero .label {
+      font-size: 36px; font-weight: 500; margin-top: 12px; opacity: .75;
+    }
+
+    /* Ícono squircle social (más grande que en documentos) */
+    .icon-wrap {
+      width: 80px; height: 80px;
+      -webkit-mask: var(--sq) center/cover no-repeat;
+      mask: var(--sq) center/cover no-repeat;
+      background: var(--blue-75);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .icon-wrap svg      { width: 40px; height: 40px; stroke: var(--blue-500); }
+    .icon-wrap-dark {
+      width: 80px; height: 80px;
+      -webkit-mask: var(--sq) center/cover no-repeat;
+      mask: var(--sq) center/cover no-repeat;
+      background: rgba(77,151,255,.18);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .icon-wrap-dark svg { width: 40px; height: 40px; stroke: var(--blue-450); }
+
+    /* Chips */
+    .chip {
+      display: inline-flex; align-items: center; gap: 10px;
+      background: rgba(255,255,255,.9); border: 1px solid var(--slate-200);
+      border-radius: 9999px; padding: 10px 22px;
+      font-size: 26px; font-weight: 500; color: var(--slate-700);
+    }
+    .chip img { height: 28px; width: auto; }
+    .chip-dark {
+      display: inline-flex; align-items: center; gap: 10px;
+      background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.15);
+      border-radius: 9999px; padding: 10px 22px;
+      font-size: 26px; font-weight: 500; color: white;
+    }
+
+    /* Botón social */
+    .btn {
+      display: inline-flex; align-items: center; gap: 12px;
+      border-radius: 9999px; padding: 18px 44px;
+      font-size: 30px; font-weight: 600;
+    }
+    .btn-dark-social  { background: var(--blue-950); color: white; }
+    .btn-light-social { background: white; color: var(--blue-950); }
+    .btn-blue-social  { background: var(--blue-500); color: white; }
+
+    /* Bullet list social */
+    .bullet-list { list-style: none; display: flex; flex-direction: column; gap: 20px; }
+    .bullet-list li {
+      display: flex; align-items: flex-start; gap: 16px;
+      font-size: 36px; font-weight: 400; line-height: 1.4;
+    }
+    .bullet-icon { width: 40px; height: 40px; flex-shrink: 0; margin-top: 2px; }
+
+    /* Grillas */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr;     gap: 28px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; }
+
+    /* Divisor */
+    .divider { border: none; border-top: 1px solid rgba(255,255,255,.12); margin: 20px 0; }
+    .divider-light { border: none; border-top: 1px solid var(--slate-200); margin: 20px 0; }
+
+  </style>
+</head>
+<body>
+
+<!--
+  ════════════════════════════════════════════════════════════
+  INSTRUCCIONES DE USO:
+  1. En .canvas: elige clase de fondo → bg-light / bg-light-blob / bg-dark / bg-white
+  2. Ajusta --canvas-h en :root según el formato
+  3. En .logo-area: pega el SVG del logo correspondiente al modo
+       - Modo light: logo.horizontal.dark-blue.svg
+       - Modo dark:  logo.horizontal.white.svg
+  4. En .content-area: construye el layout de la pieza
+  5. En .bottom-area: agrega slogan, CTA o indicador de slide
+  ════════════════════════════════════════════════════════════
+-->
+
+<div class="canvas bg-light">  <!-- ← cambiar clase de fondo aquí -->
+
+  <div class="safe">
+
+    <!-- ── Logo (siempre presente) ── -->
+    <div class="logo-area">
+      <!-- CONTENIDO: logo SVG inline según modo
+           light → elementos/logo.horizontal.dark-blue.svg  (o white-blue)
+           dark  → elementos/logo.horizontal.white.svg
+      -->
+      [logo aquí]
+    </div>
+
+    <!-- ── Tag de categoría (opcional) ── -->
+    <!-- <div class="tag-area">
+      [tag.vambe.lovers.svg inline, o tag.blog.svg, etc.]
+    </div> -->
+
+    <!-- ══════════════════════════════════════════════════════
+         ZONA DE CONTENIDO — reemplazar con el layout real
+
+         EJEMPLOS DE LAYOUTS FRECUENTES:
+
+         A) Titular con Authentic + bajada
+         B) Cifra hero (métrica grande)
+         C) Lista de bullets
+         D) Grid de 2–3 cards con ícono
+         E) Foto/mockup + texto lateral
+         ══════════════════════════════════════════════════════ -->
+    <div class="content-area">
+
+      <!-- EJEMPLO A: Titular con acento Authentic + bajada -->
+      <!--
+      <div style="color:var(--blue-950);">
+        <div class="t-eyebrow hl" style="margin-bottom:24px;">[Eyebrow]</div>
+        <div class="t-headline" style="margin-bottom:20px; line-height:1.1;">
+          [Texto antes de la ]<br>
+          <span class="auth hl">[palabra]</span> [resto]
+        </div>
+        <div class="t-body secondary" style="color:var(--slate-600); max-width:700px;">
+          [Bajada, 1–2 líneas]
+        </div>
+      </div>
+      -->
+
+      <!-- EJEMPLO B: Cifra protagonista (métrica hero) -->
+      <!--
+      <div style="color:var(--blue-950);">
+        <div class="t-eyebrow" style="color:var(--slate-500); margin-bottom:32px;">[Contexto]</div>
+        <div class="t-hero hl" style="margin-bottom:8px;">[30M+]</div>
+        <div class="t-subhead" style="font-weight:400; color:var(--slate-700);">[descripción breve]</div>
+      </div>
+      -->
+
+      <!-- CONTENIDO: pon aquí el layout de la pieza -->
+      <div style="color:var(--blue-950); font-size:38px; opacity:.3;">[contenido]</div>
+
+    </div><!-- /content-area -->
+
+
+    <!-- ── Zona inferior ── -->
+    <div class="bottom-area">
+
+      <!-- Izquierda: slogan, claim o vacío -->
+      <div style="font-size:26px; color:var(--slate-500);">
+        <!-- CONTENIDO: slogan, tagline, o dejar vacío -->
+        <!-- Opción: svg inline de slogan-hor.frase.svg o slogan-hor.der.svg -->
+      </div>
+
+      <!-- Derecha: CTA pill o indicador de slide -->
+      <!-- <a class="btn btn-dark-social">[CTA] →</a> -->
+      <!-- <div>[slide-indicator SVG inline]</div> -->
+
+    </div><!-- /bottom-area -->
+
+  </div><!-- /safe -->
+
+</div><!-- /canvas -->
+
+</body>
+</html>

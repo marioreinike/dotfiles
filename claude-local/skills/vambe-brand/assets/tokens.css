@@ -1,0 +1,260 @@
+/* =============================================================
+   VAMBE · DESIGN SYSTEM SPEC
+   Fuente: catálogo de tokens (Brand Book 2026)
+   Uso: subir a Claude Design para extracción del design system.
+   Formato CSS = se lee como "código/estilos" → extrae valores exactos.
+   ============================================================= */
+
+/* -------------------------------------------------------------
+   REGLAS CLAVE (Claude: léelas antes de diseñar)
+   -------------------------------------------------------------
+   PERSONALIDAD: limpio, sistemático, "humano-tech". Mucho aire,
+   azul de marca, una pizca de script (Authentic) como acento humano.
+
+   GOBERNANZA DE COLOR (qué familia para qué):
+   - Vambe Blue  → núcleo de marca: logo, acentos, CTAs, UI.
+   - Slate       → neutrales: texto, bordes, superficies, grises.
+   - Iris Violet → acento secundario, uso puntual (NO protagonista).
+   - Ads Amber   → EXCLUSIVO de piezas Vambe Ads. No usar fuera de ahí.
+   - blob-blue (#006AFF) → SOLO color del blob. Nunca como azul de UI.
+
+   TIPOGRAFÍA (flexible por composición):
+   - El tamaño absoluto es LIBRE; lo fijo es el ROL, el peso y la familia.
+   - Base de cálculo: ANCHO del canvas (1080). Escala igual en feed/story.
+   - Jerarquía: 1 solo elemento domina por pieza. Máx 3–4 niveles de tamaño.
+   - Contraste: cada nivel >= ~1.4x el siguiente más chico.
+   - Mínimos legibles por rol (abajo). Authentic = 1 palabra/frase, nunca más.
+
+   LAYOUT / GRILLA (manda en social):
+   - Canvas base IG feed: 1080 x 1350 (4:5).
+   - Margen 65px en los 4 lados (uniforme). Contenido y logo DENTRO del área segura.
+   - Logo SIEMPRE presente, alto 45px (~4.2% del ancho), centrado arriba/abajo o en esquinas.
+   - En carruseles, el logo puede ir solo en 1ra y última slide.
+   - Único elemento que puede cruzar el margen: algo que "sale del frame" a propósito
+     (card, foto, blob) — nunca el texto ni el logo.
+   - A nivel feed: alternar fondo dark/light para que la grilla no se vea plana.
+
+   NOTIFICATION CARDS (matriz 3x3 = 9):
+   - 3 tipos (precio / avatar / texto) x 3 tonos (claro / medio / oscuro).
+   - Tono según contraste con la foto: foto oscura -> card clara; foto clara -> card oscura/media.
+   - Integración: flotando, detrás de un elemento, o saliendo del frame. Máx 2-3 por escena.
+
+   DON'TS: colores/tipos/radios fuera del sistema; #006AFF como UI; Authentic >1 palabra;
+   deformar logo/mockups; amontonar blobs o cards; reconstruir a mano lo que existe como SVG.
+   ------------------------------------------------------------- */
+
+:root {
+  /* ===================== COLOR ===================== */
+  /* Vambe Blue */
+  --blue-950: #0A1C43;
+  --blue-900: #1D3D81;
+  --blue-800: #1B4298;
+  --blue-700: #1C4EBA;
+  --blue-600: #2861DC;
+  --blue-550: #2C66E2;
+  --blue-500: #437AEF;
+  --blue-450: #5A8CF6;
+  --blue-400: #729CF8;
+  --blue-300: #88ACFC;
+  --blue-250: #A6C1FC;
+  --blue-200: #B4CBFE;
+  --blue-150: #C8D9FE;
+  --blue-100: #D3E0FD;
+  --blue-75: #E1EAFE;
+  --blue-50: #F2F6FE;
+  --blue-25: #F5F8FF;
+
+  /* Slate (neutral) */
+  --slate-primary: #697389;
+  --slate-950: #020617;
+  --slate-900: #0F172A;
+  --slate-800: #1E293B;
+  --slate-700: #334155;
+  --slate-600: #475569;
+  --slate-550: #556379;
+  --slate-500: #64748B;
+  --slate-450: #7F91A8;
+  --slate-400: #94A3B8;
+  --slate-300: #B9C6D7;
+  --slate-250: #CBD5E1;
+  --slate-200: #D8E0EA;
+  --slate-150: #D9E1ED;
+  --slate-100: #E2E8F0;
+  --slate-75: #EAEFF4;
+  --slate-50: #F1F5F9;
+  --slate-25: #F8FAFC;
+  --slate-10: #FCFDFE;
+
+  /* Iris Violet */
+  --violet-primary: #9700FA;
+  --violet-900: #440061;
+  --violet-800: #520075;
+  --violet-700: #7900AD;
+  --violet-600: #8F00CC;
+  --violet-500: #A100E6;
+  --violet-450: #B200FF;
+  --violet-300: #D470FF;
+  --violet-200: #E3A3FF;
+  --violet-150: #EEC7FF;
+  --violet-100: #F7E5FF;
+  --violet-50: #FCF5FF;
+
+  /* Ads Amber */
+  --amber-primary: #F86F07;
+  --amber-900: #460C01;
+  --amber-800: #7A1F0D;
+  --amber-700: #94240C;
+  --amber-600: #B72F05;
+  --amber-500: #DC4D01;
+  --amber-450: #F86F07;
+  --amber-400: #FF951F;
+  --amber-300: #FFAA3B;
+  --amber-200: #FFCF87;
+  --amber-100: #FFE9C7;
+  --amber-50: #FFF7EC;
+
+  /* Ads neutrales */
+  --ads-neutral-900: #171717;
+  --ads-neutral-600: #404040;
+  --ads-neutral-300: #A1A1A1;
+  --ads-neutral-100: #E5E5E5;
+
+  /* Gradiente */
+  --blob-blue: #006AFF;
+  --grad-light-from: #F5F8FF;
+  --grad-light-to: #E2EAFF;
+  --grad-dark-from: #080E1C;
+  --grad-dark-to: #0F1A33;
+
+  /* Base */
+  --white: #FFFFFF;
+
+  /* Alias semánticos */
+  --brand-blue: var(--blue-500);      /* #437AEF primario */
+  --text-primary: var(--blue-950);
+  --text-secondary: var(--slate-600);
+  --surface-light: var(--white);
+  --surface-dark: var(--blue-950);
+  --accent: var(--blue-500);
+
+  /* ===================== TIPOGRAFÍA ===================== */
+  --font-primary: "Plus Jakarta Sans", sans-serif;
+  --font-script:  "Authentic", cursive;   /* fuente exacta, no sustituir por genérica */
+  --fw-light:300; --fw-regular:400; --fw-medium:500;
+  --fw-semibold:600; --fw-bold:700; --fw-extrabold:800;
+
+  --canvas-width: 1080px;  /* base de cálculo del tamaño tipográfico */
+  /* Tamaño absoluto FLEXIBLE. Estos son MÍNIMOS legibles por rol (@1080px).
+     Rango sugerido y tratamiento en el comentario de cada uno. */
+  --type-eyebrow-min: 27px;   /* rango 1.8–2.4% ancho · MAYÚSCULAS + tracking · SemiBold */
+  --type-caption-min: 25px;   /* rango 2.4–3%   · Medium · texto de card/UI/fuente */
+  --type-body-min:    35px;   /* rango 2.8–4%   · Regular (Bold p/ énfasis) */
+  --type-subhead-min: 55px;   /* rango 4–6%     · Bold */
+  --type-headline-min:80px;   /* rango 7–12%    · ExtraBold */
+  --type-hero-min:   130px;   /* rango 12–22%+  · ExtraBold · cifra/dato protagonista */
+  /* type-accent-script: Authentic, tamaño contextual (~ al titular que acompaña) */
+
+  /* ===================== ESPACIADO (escala 4px) ===================== */
+  /* TODO confirmar en Figma */
+  --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px;
+  --space-6:24px; --space-8:32px; --space-12:48px; --space-16:64px;
+
+  /* ===================== RADIO ===================== */
+  --radius-sm:8px;     /* TODO confirmar · tags, pills chicos */
+  --radius-md:12px;    /* TODO confirmar · cards, contenedores */
+  --radius-lg:20px;    /* TODO confirmar · frames de imagen, mockups */
+  --radius-pill:9999px;/* botones, swatches */
+  --radius-circle:50%; /* marco de foto de personas */
+  /* radius-squircle: esquina suave del squircle de íconos (TODO confirmar) */
+
+  /* ===================== EFECTOS: GRADIENTE / BLOB ===================== */
+  --grad-base-light: linear-gradient(135deg, var(--grad-light-from), var(--grad-light-to));
+  --grad-base-dark:  linear-gradient(135deg, var(--grad-dark-from),  var(--grad-dark-to));
+  --blob-size: 65%;          /* del canvas */
+  --blob-blur: 28%;          /* del canvas */
+  --blob-opacity-light-primary: .30;
+  --blob-opacity-light-secondary: .18;
+  --blob-opacity-dark-primary: .40;
+  --blob-opacity-dark-secondary: .22;
+  /* blob positions: centro-der · diag-izq-der · diag-der-izq · esq sup/inf izq/der */
+
+  --shadow-card: 0 2px 12px rgba(10,28,67,.08); /* TODO confirmar valor real */
+  /* stroke-frame: trazo sutil · gradient-frame-fill: degradado azul */
+
+  /* ===================== LAYOUT ===================== */
+  /* IG feed 1080x1350 (4:5) · story/reel 1080x1920 · square 1080x1080
+     LinkedIn post 1080x1350 · LinkedIn banner ~1584x396 (TODO confirmar) */
+  --post-margin: 65px;     /* 4 lados, uniforme */
+  --logo-height: 45px;     /* ~4.2% del ancho · logo presente siempre */
+}
+
+/* =============================================================
+   COMPONENTES (specs)
+   ============================================================= */
+
+/* --- Notification card (base; ver matriz 3x3 en reglas) --- */
+.card {
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-4);                 /* TODO confirmar */
+  border: 1px solid var(--slate-200);      /* TODO confirmar grosor/color real */
+  font-family: var(--font-primary);
+}
+/* tonos: .card--claro / .card--medio / .card--oscuro
+   tipos: .card--precio / .card--avatar / .card--texto
+   texto interno = type.caption; precio = peso bold (TODO tamaño) */
+
+/* --- Botones (pill) ---
+   NOTA: button.savedate = button.cta (mismo componente, no se duplica).
+   Los SVGs button.cta.{light,dark,icon} son REFERENCIAS visuales —
+   el botón real se construye con CSS porque el texto cambia.
+*/
+.button { border-radius: var(--radius-pill); padding: var(--space-3) var(--space-6); /* TODO */
+  font-weight: var(--fw-semibold); }
+.button--cta--dark   { background: var(--blue-950); color: var(--white); /* + borde interior claro */ }
+.button--cta--light  { background: var(--white); color: var(--blue-950); border:1px solid var(--blue-950); }
+.button--cta--icon   { /* mismo CTA + ícono Lucide a la izquierda */ }
+
+/* --- Tag de categoría (Post Categorizados) --- */
+.tag { border-radius: var(--radius-pill); border:1px solid var(--blue-500);
+  color: var(--blue-500); /* ícono Lucide a la izquierda + texto */ }
+/* variantes: jobs · life · evento · alianza · product-update · blog · lovers · webinar */
+
+/* --- Frames de foto --- */
+/* frame.photo-circle  : marco circular con fondo degradado azul (personas)
+   computer.fill.light / .outline.light / .rect.outline.dark / .glass :
+     mockup desktop con notch (sustituye al antiguo frame.rect; assets en /elementos/) */
+
+/* --- Iconografía --- */
+/* Librería: Lucide. Estilo: solo, o dentro de squircle.
+   Assets de squircle: squircle.filled (azul) y squircle.outlined.
+   Ícono = 50% del área del squircle; squircle = 2x el ícono.
+   stroke: TODO confirmar (default Lucide 2px). NO exportar íconos: usar por nombre. */
+
+/* --- Otros elementos (assets SVG) --- */
+/* Flechas de carrusel:
+     scribble.arrow.1 / .2 / .3   (flechas punteadas curvas que conectan slides)
+     arrow.bubble.blue / .white   (pill con flecha, para slogan/desliza)
+   Quote y bullets:
+     quote-mark
+     bullet.check / .x / .arrow / .dot
+   Diálogo:
+     dialog-balloon.blue.left / .blue.right / .light.left / .light.right
+   Indicadores de progreso:
+     slide-indicator.short.{light|medium|dark}
+     slide-indicator.long.{light|medium|dark}
+   Shield decorativo (Diamond Shield):
+     shield.pattern (genérico, opacidad baja)
+     shield.gradient.{light|dark} y shield.gradient.light.2 (con relleno degradado)
+     shield.line, shield.line.gradient.{light|dark} (versión outline)
+     isotipo (Diamond Shield solo)
+   Logo / lockups:
+     logo.powered-by, logo.vambe-live (este último para posts de webinar)
+   Slogan "Desliza para ver":
+     slogan.{horizontal|vertical}.{centrado|derecha|izquierda}
+     slide.pill.{light|dark} (variante compacta con flecha) */
+
+/* --- Mockups --- */
+/* mockup.phone.{claro|fill.light|fill.dark|outline|glass} — celular en 5 variantes
+   computer.{fill.light|outline.light|rect.outline.dark|glass} — desktop con notch
+   Marco = vector; pantalla/foto interior = capa reemplazable (mockup.screen-layer, ✎ inventado). */
