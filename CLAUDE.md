@@ -57,7 +57,7 @@ agent-monitor/    → Claude Code agent dashboard scripts (~/.local/bin/)
 | `claude-local/plugins/config.json` | `~/.claude/plugins/config.json` |
 | `claude-local/plugins/installed_plugins.json` | `~/.claude/plugins/installed_plugins.json` |
 | `claude-local/plugins/known_marketplaces.json` | `~/.claude/plugins/known_marketplaces.json` |
-| `claude-local/skills/*/SKILL.md` | `~/.claude/skills/*/SKILL.md` |
+| `claude-local/skills/*/` (whole dir: SKILL.md + bundled scripts/config) | `~/.claude/skills/*/` |
 | `claude-local/statusline.sh` | `~/.claude/statusline.sh` |
 | `claude-local/mcp-servers.json` | `~/.claude.json` (mcpServers key only) |
 
@@ -96,6 +96,7 @@ agent-monitor/    → Claude Code agent dashboard scripts (~/.local/bin/)
 **User-level skills** (backed up in `claude-local/skills/`, synced to `~/.claude/skills/`):
 - `/tmux` — Inspect tmux environment: list panes, read output, send commands, create panes/windows/sessions
 - `/metabase` — Query Vambe production data (backend Postgres + apollo Mongo) via Metabase MCP. Auto-invokes when a question could be answered with prod data; gates the MCP behind one-time per-session approval.
+- `/dispatch` — Workspace dispatcher for git worktrees. Reports workspace status (free vs. unfinished/unmerged) and prepares new features: finds a free workspace, forks branches across the touched repos, and launches a Claude session in a fresh tmux session `wsN-<feature>`. Bundles `scripts/ws-scan.sh` + `repos.conf` (alias→repo→base map).
 
 When Mario asks to create global skills, save them to both `~/.claude/skills/<name>/SKILL.md` and `claude-local/skills/<name>/SKILL.md`.
 

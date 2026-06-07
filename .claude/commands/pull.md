@@ -14,6 +14,7 @@ Only after the user confirms, apply all changes:
 - Copy claude-local/settings.json → ~/.claude/settings.json
 - Copy claude-local/plugins/*.json → ~/.claude/plugins/
 - If claude-local/commands/ has files, copy them → ~/.claude/commands/
+- For claude-local/skills/, copy each skill directory RECURSIVELY → ~/.claude/skills/<name>/ (whole dir, including bundled scripts/, *.conf, and reference files; restore the executable bit on scripts via `chmod +x`)
 - Merge claude-local/mcp-servers.json into ~/.claude.json (mcpServers key only — preserve all other keys). Never overwrite live secret values with redacted placeholders — only add/update server structure and non-secret fields.
 - Create parent directories if they don't exist
 
