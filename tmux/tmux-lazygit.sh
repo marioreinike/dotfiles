@@ -5,6 +5,12 @@
 
 set -u
 
+# This runs under bash in a tmux popup, which does NOT source ~/.zshrc, so
+# XDG_CONFIG_HOME is unset here. Without it, lazygit on macOS falls back to
+# ~/Library/Application Support/lazygit (no delta pager config) instead of
+# ~/.config/lazygit. Set it so the popup uses the same config as the shell.
+export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+
 DIR="${1:-$PWD}"
 cd "$DIR" || exit 1
 
