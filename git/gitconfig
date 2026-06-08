@@ -9,6 +9,10 @@
 	l = log --oneline
 	cane = commit --amend --no-edit
 	lg = log --graph --oneline --decorate --all
+	rba = rebase --autosquash
+	rbi = rebase --interactive
+	rbai = rebase --autosquash --interactive
+	rbia = rebase --autosquash --interactive
 [user]
 	name = Mario Reinike
 	email = marioreinike@gmail.com
