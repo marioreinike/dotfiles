@@ -1,7 +1,7 @@
 ---
 name: dispatch
-description: Workspace dispatcher for git worktrees. Find a free workspace, prepare a new feature (fork branches across the repos you're touching) and launch a Claude session in tmux — or report the status of all workspaces (which are free, which still hold unfinished/unmerged work). Use when asked to start/prepare a feature, spin up a workspace, dispatch work, or check workspace/worktree status. Keywords - dispatch, dispatcher, workspace, worktree, prepare feature, new feature, free workspace, spin up, ws status.
-argument-hint: status | prepare <feature-name> in <repos…>
+description: Workspace dispatcher for git worktrees. Find a free workspace, prepare a new feature (fork branches across the repos you're touching) and launch a Claude session in tmux; launch a Claude session directly inside a repo clone (no worktree); or report the status of all workspaces (which are free, which still hold unfinished/unmerged work). Use when asked to start/prepare a feature, spin up a workspace, dispatch work in a repo, or check workspace/worktree status. Keywords - dispatch, dispatcher, workspace, worktree, no worktree, in repo, prepare feature, new feature, free workspace, spin up, ws status.
+argument-hint: status | prepare <feature-name> in <repos…> | repo <alias-or-repo>
 allowed-tools: Bash, Read, Edit, Write, AskUserQuestion
 ---
 
@@ -14,7 +14,14 @@ You manage Mario's worktree-based workflow across two roots:
 
 The alias → repo → base-branch map lives in `${CLAUDE_SKILL_DIR}/repos.conf` (whitespace table). Repos not listed fall back to their `origin/HEAD` default branch. Add a row when you adopt a new alias.
 
-Two modes — **status** (read-only) and **prepare** (mutating, always confirm first).
+Three modes — **status** (read-only), **prepare** (worktree-based, mutating, always confirm first), and **repo** (launch a session directly inside a `~/REPOS/<repo>` clone, no worktree).
+
+**Launch command (all modes):** every Claude session is started in auto mode, with its display name (`--name`) set to the tmux session (`$SESSION`). Remote control is **opt-in** — add it *only* when the user explicitly says "remote"; when enabled, name the remote-control session the same way:
+```bash
+claude --permission-mode auto --name "$SESSION"                          # default
+claude --permission-mode auto --name "$SESSION" --remote-control "$SESSION"   # only when the user asks for "remote"
+```
+Never launch plain `claude`.
 
 ## Freeness rule
 
@@ -86,12 +93,45 @@ On confirmation, copy each to the same relative path under `$WT` (`mkdir -p` par
 SESSION="${WS}-${SLUG}"   # already sanitized
 tmux has-session -t "$SESSION" 2>/dev/null && SESSION="${SESSION}-2"   # avoid clash
 tmux new-session -d -s "$SESSION" -c "$HOME/WORKSPACES/$WS"
-tmux send-keys -t "$SESSION" 'claude' Enter
+# add --remote-control "$SESSION" only if the user explicitly asked for "remote"
+tmux send-keys -t "$SESSION" "claude --permission-mode auto --name \"$SESSION\"" Enter
 ```
 Do **not** auto-attach. Tell the user to run: `tmux attach -t "$SESSION"`.
 
 ### 7. Report
 Summarize: workspace, session name + attach command, and per repo the branch created, base it forked from, whether the worktree was created or reused, and any env files copied or still pending.
+
+---
+
+## Mode: REPO (no worktree)
+
+For "dispatch a session in <repo>", "spin up Claude inside backend (no worktree)", "just launch Claude in the repo". No workspace, no worktree, no branch forking — just a tmux session running Claude in the canonical clone at `~/REPOS/<repo>`.
+
+### 1. Resolve the repo dir
+Accept an **alias** (resolved via `repos.conf`) or a bare repo/dir name:
+```bash
+CONF="${CLAUDE_SKILL_DIR}/repos.conf"
+repo=$(awk -v a="$arg" '$1!~/^#/&&$1==a{print $2}' "$CONF")   # alias → repo
+[ -z "$repo" ] && repo="$arg"                                 # else treat arg as the repo dir name
+REPO="$HOME/REPOS/$repo"
+```
+If `$REPO` isn't an existing git repo, report it and stop.
+
+### 2. Confirm (REQUIRED before launching)
+Show: the repo dir, its current branch, and the session name. Branch handling: stay on the **current branch by default**. Only create/switch a branch if the user explicitly asked — there's no worktree isolation here, so a checkout mutates the working clone. Wait for confirmation.
+
+### 3. Launch the Claude session (detached)
+```bash
+SESSION="$repo"   # named exactly as the repo; sanitize / : . → -
+tmux has-session -t "$SESSION" 2>/dev/null && SESSION="${SESSION}-2"   # avoid clash
+tmux new-session -d -s "$SESSION" -c "$REPO"
+# add --remote-control "$SESSION" only if the user explicitly asked for "remote"
+tmux send-keys -t "$SESSION" "claude --permission-mode auto --name \"$SESSION\"" Enter
+```
+Do **not** auto-attach. Tell the user: `tmux attach -t "$SESSION"`.
+
+### 4. Report
+Summarize: repo dir, branch the session is on, session name + attach command.
 
 ---
 
