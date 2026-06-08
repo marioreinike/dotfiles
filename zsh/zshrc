@@ -16,6 +16,11 @@ emulate zsh -c "$(direnv hook zsh)"
 # If you come from bash you might have to change your $PATH.
 export PATH=$HOME/bin:$HOME/.local/bin:/usr/local/bin:$PATH
 
+# Standardize XDG config dir to ~/.config on every OS (portable dotfiles).
+# On macOS this makes tools like lazygit read ~/.config/lazygit instead of
+# ~/Library/Application Support/lazygit; on Linux ~/.config is the default.
+export XDG_CONFIG_HOME="$HOME/.config"
+
 # Path to your Oh My Zsh installation.
 export ZSH="$HOME/.oh-my-zsh"
 

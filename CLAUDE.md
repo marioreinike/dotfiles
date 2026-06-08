@@ -17,7 +17,7 @@ This repo is Mario's personal dotfiles/setup repository. It stores all computer 
 .claude/          → Project-level: sync skills and repo permissions (NOT backed up configs)
 claude-local/     → Mirror of ~/.claude/ (backup for restoring on a new computer)
 git/              → Git config (~/.gitconfig, includes delta diff config) and global gitignore (~/.config/git/ignore)
-lazygit/          → Lazygit config (~/Library/Application Support/lazygit/config.yml)
+lazygit/          → Lazygit config (~/.config/lazygit/config.yml)
 zsh/              → Zsh shell config (~/.zshrc) and Powerlevel10k theme (~/.p10k.zsh)
 atuin/            → Atuin shell history config (~/.config/atuin/config.toml)
 gh/               → GitHub CLI config (~/.config/gh/config.yml)
@@ -35,7 +35,7 @@ agent-monitor/    → Claude Code agent dashboard scripts (~/.local/bin/)
 |---|---|
 | `git/gitconfig` | `~/.gitconfig` |
 | `git/gitignore_global` | `~/.config/git/ignore` |
-| `lazygit/config.yml` | `~/Library/Application Support/lazygit/config.yml` |
+| `lazygit/config.yml` | `~/.config/lazygit/config.yml` |
 | `zsh/zshrc` | `~/.zshrc` |
 | `zsh/p10k.zsh` | `~/.p10k.zsh` |
 | `atuin/config.toml` | `~/.config/atuin/config.toml` |
@@ -86,7 +86,7 @@ agent-monitor/    → Claude Code agent dashboard scripts (~/.local/bin/)
 Two linked tools handle git diffs; their configs live in two different files:
 
 - **delta** — the diff pager. Configured entirely in `~/.gitconfig` (tracked at `git/gitconfig`), NOT in a delta-specific file. Relevant sections: `[core] pager`, `[interactive] diffFilter`, `[delta]`, and the named feature blocks `[delta "default"]` (side-by-side, line numbers, navigate — used for normal `git diff`) and `[delta "lazygit"]` (a compact, non-side-by-side variant).
-- **lazygit** — the TUI. Config at `~/Library/Application Support/lazygit/config.yml` (tracked at `lazygit/config.yml`). It only sets its pager to `delta --paging=never --features lazygit`, which pulls in the `[delta "lazygit"]` feature block from gitconfig.
+- **lazygit** — the TUI. Config at `~/.config/lazygit/config.yml` (tracked at `lazygit/config.yml`). On Linux that's lazygit's default location; on macOS lazygit defaults to `~/Library/Application Support/lazygit/`, so `zsh/zshrc` exports `XDG_CONFIG_HOME="$HOME/.config"` to point lazygit (and other XDG-aware tools) at `~/.config` on every OS. It only sets its pager to `delta --paging=never --features lazygit`, which pulls in the `[delta "lazygit"]` feature block from gitconfig.
 
 So delta's appearance inside lazygit is controlled by the `[delta "lazygit"]` section in `git/gitconfig`, not by the lazygit config. Lazygit's `state.yml` (sibling of `config.yml`) is runtime state and is intentionally NOT tracked.
 
