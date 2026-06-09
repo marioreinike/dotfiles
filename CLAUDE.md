@@ -112,6 +112,7 @@ So delta's appearance inside lazygit is controlled by the `[delta "lazygit"]` se
 - `/metabase` — Query Vambe production data (backend Postgres + apollo Mongo) via Metabase MCP. Auto-invokes when a question could be answered with prod data; gates the MCP behind one-time per-session approval.
 - `/dispatch` — Workspace dispatcher for git worktrees. Reports workspace status (free vs. unfinished/unmerged) and prepares new features: finds a free workspace, forks branches across the touched repos, and launches a Claude session in a fresh tmux session `wsN-<feature>`. Bundles `scripts/ws-scan.sh` + `repos.conf` (alias→repo→base map).
 - `/applock` — Lease a `(service, port)` before running an app for local testing, so competing agents never bind the same port. Atomic flock acquire + heartbeat renewal + TTL reclaim; waits when the port is busy; auto-releases on exit. Backed by the `~/.local/bin/applock` CLI (tracked at `applock/applock`); ports dictionary at `~/.applock/services.json`.
+- `/playwright` — Drive a real Chromium browser via the Playwright MCP (navigate, click, fill forms, screenshot, scrape JS-rendered pages, save page PDFs, e2e checks). Documents the shared-persistent-profile **single-driver constraint** (only one session can drive the browser at a time; logins persist), how to recover from a stale `Browser is already in use` lock, and the close-when-done discipline.
 
 When Mario asks to create global skills, save them to both `~/.claude/skills/<name>/SKILL.md` and `claude-local/skills/<name>/SKILL.md`.
 
@@ -122,6 +123,8 @@ Global MCP servers are configured in `~/.claude.json` (mcpServers key). The full
 To restore on a new computer, use the `/pull` skill which merges `mcp-servers.json` into `~/.claude.json`, then manually set the redacted secrets:
 - `datadog-mcp`: headers `DD_API_KEY` and `DD_APPLICATION_KEY`
 - `metabase`: env `METABASE_API_KEY`
+
+The `playwright` entry is **platform-specific**. The backed-up values are macOS (`--browser chrome`, `--user-data-dir /Users/mario/.cache/playwright-mcp-profile`). On Linux the live config uses `--browser chromium` and `--user-data-dir /home/mario/.cache/playwright-mcp-profile` (Playwright's managed Chromium under `~/.cache/ms-playwright/`; no system Chrome installed there) — adjust after `/pull` on a Linux box. The profile is shared and persistent, so only one Claude session can drive the browser at a time — see the `/playwright` skill for the single-driver constraint and lock recovery.
 
 Tool permissions for these servers are tracked in `claude-local/settings.json`.
 
