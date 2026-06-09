@@ -27,6 +27,7 @@ nvim/             → Neovim config with NvChad (~/.config/nvim/lua/ and .stylua
 tmux/             → Tmux terminal multiplexer config (~/.config/tmux/)
 nano/             → Nano editor config (~/.nanorc)
 agent-monitor/    → Claude Code agent dashboard scripts (~/.local/bin/)
+applock/          → Port-lease manager so competing agents don't collide running apps (~/.local/bin/applock)
 ```
 
 ## File-to-System Mapping
@@ -54,6 +55,8 @@ agent-monitor/    → Claude Code agent dashboard scripts (~/.local/bin/)
 | `agent-monitor/claude-notify` | `~/.local/bin/claude-notify` |
 | `agent-monitor/claude-state-hook` | `~/.local/bin/claude-state-hook` |
 | `agent-monitor/claude-format-hook` | `~/.local/bin/claude-format-hook` |
+| `applock/applock` | `~/.local/bin/applock` |
+| `applock/services.example.json` | (seeds `~/.applock/services.json` on first use; runtime state under `~/.applock/` is NOT tracked) |
 | `claude-local/CLAUDE.md` | `~/.claude/CLAUDE.md` |
 | `claude-local/settings.json` | `~/.claude/settings.json` |
 | `claude-local/plugins/config.json` | `~/.claude/plugins/config.json` |
@@ -108,6 +111,7 @@ So delta's appearance inside lazygit is controlled by the `[delta "lazygit"]` se
 - `/tmux` — Inspect tmux environment: list panes, read output, send commands, create panes/windows/sessions
 - `/metabase` — Query Vambe production data (backend Postgres + apollo Mongo) via Metabase MCP. Auto-invokes when a question could be answered with prod data; gates the MCP behind one-time per-session approval.
 - `/dispatch` — Workspace dispatcher for git worktrees. Reports workspace status (free vs. unfinished/unmerged) and prepares new features: finds a free workspace, forks branches across the touched repos, and launches a Claude session in a fresh tmux session `wsN-<feature>`. Bundles `scripts/ws-scan.sh` + `repos.conf` (alias→repo→base map).
+- `/applock` — Lease a `(service, port)` before running an app for local testing, so competing agents never bind the same port. Atomic flock acquire + heartbeat renewal + TTL reclaim; waits when the port is busy; auto-releases on exit. Backed by the `~/.local/bin/applock` CLI (tracked at `applock/applock`); ports dictionary at `~/.applock/services.json`.
 
 When Mario asks to create global skills, save them to both `~/.claude/skills/<name>/SKILL.md` and `claude-local/skills/<name>/SKILL.md`.
 

@@ -1,0 +1,763 @@
+#!/usr/bin/env python3
+"""applock — single-host resource lease manager for running apps under test.
+
+A lease is a (service, port) pair. The host advertises which port(s) each
+service may use in a "ports dictionary" (services.json). Only one process may
+hold a given (service, port) at a time. Agents compete for leases; when all
+ports for a service are taken they wait until one frees.
+
+Leases are renewed by a heartbeat and carry a TTL, so a crashed/forgotten lease
+expires and can be reclaimed. All check-and-set operations are serialized with
+flock on a single registry lock file, so acquisition is race-free.
+
+Env knobs:
+  APPLOCK_HOME            state dir            (default ~/.applock)
+  LOCK_TTL                lease TTL seconds    (default 90)
+  LOCK_RENEW_INTERVAL     heartbeat seconds    (default 30, must be <= TTL)
+  APPLOCK_WAIT_INTERVAL   poll seconds when waiting for a free port (default 5)
+  APPLOCK_OWNER           label for who holds the lease (default tmux session / user@host:pid)
+
+Subcommands:
+  run <service> [opts] -- <cmd...>   acquire, run cmd with $PORT set, renew, release on exit
+  acquire <service> [opts]           acquire + detach a renewer; prints {lease_id, port} JSON
+  release (<service> <port> | --lease <id>)   release a lease and stop its renewer
+  status [service] [--json]          show leases and per-service port availability
+  services                           print the ports dictionary
+  add-service <name> <port>...       register/replace a service's allowed ports
+  gc                                 delete expired lease files
+  __renew <lease_id>                 (internal) detached heartbeat loop
+"""
+
+import argparse
+import contextlib
+import errno
+import fcntl
+import getpass
+import json
+import os
+import re
+import signal
+import socket
+import subprocess
+import sys
+import threading
+import time
+import uuid
+from datetime import datetime
+
+HOME = os.environ.get("APPLOCK_HOME") or os.path.join(os.path.expanduser("~"), ".applock")
+LOCKS_DIR = os.path.join(HOME, "locks")
+SERVICES_FILE = os.path.join(HOME, "services.json")
+REGISTRY_LOCK = os.path.join(HOME, "registry.lock")
+LOG_DIR = os.path.join(HOME, "logs")
+
+DEFAULT_TTL = int(os.environ.get("LOCK_TTL", "90"))
+DEFAULT_RENEW = int(os.environ.get("LOCK_RENEW_INTERVAL", "30"))
+DEFAULT_WAIT_INTERVAL = int(os.environ.get("APPLOCK_WAIT_INTERVAL", "5"))
+# Hard upper bound on how long a lease may be renewed, regardless of heartbeats.
+# The backstop against an idle holder keeping a port forever. Default 30 min.
+DEFAULT_MAX_HOLD = int(os.environ.get("LOCK_MAX_HOLD", "1800"))
+# A waiter re-stamps its demand every poll; entries older than this are pruned,
+# so a waiter that timed out or died stops counting against the holder.
+WAITER_STALE_AFTER = max(15, DEFAULT_WAIT_INTERVAL * 3)
+
+
+# ----------------------------------------------------------------------------- helpers
+def log(msg):
+    """Human-readable progress goes to stderr; stdout is reserved for machine output."""
+    print(f"[applock] {msg}", file=sys.stderr, flush=True)
+
+
+def die(msg, code=1):
+    log(f"ERROR: {msg}")
+    sys.exit(code)
+
+
+def now():
+    return time.time()
+
+
+def iso(ts):
+    return datetime.fromtimestamp(ts).astimezone().isoformat(timespec="seconds")
+
+
+def ensure_dirs():
+    os.makedirs(LOCKS_DIR, exist_ok=True)
+    os.makedirs(LOG_DIR, exist_ok=True)
+
+
+def default_owner():
+    o = os.environ.get("APPLOCK_OWNER")
+    if o:
+        return o
+    # Prefer the tmux session name (dispatcher names them wsN-<feature>).
+    sess = os.environ.get("APPLOCK_SESSION")
+    if not sess and os.environ.get("TMUX"):
+        try:
+            sess = subprocess.check_output(
+                ["tmux", "display-message", "-p", "#S"], text=True, stderr=subprocess.DEVNULL
+            ).strip()
+        except Exception:
+            sess = ""
+    base = sess or getpass.getuser()
+    return f"{base}@{socket.gethostname()}:pid{os.getpid()}"
+
+
+def sanitize(name):
+    return re.sub(r"[^A-Za-z0-9._-]", "_", name)
+
+
+def lock_path(service, port):
+    return os.path.join(LOCKS_DIR, f"{sanitize(service)}__{port}.json")
+
+
+@contextlib.contextmanager
+def registry_lock():
+    """Serialize all read-modify-write of lease state across processes."""
+    ensure_dirs()
+    fd = open(REGISTRY_LOCK, "w")
+    try:
+        fcntl.flock(fd.fileno(), fcntl.LOCK_EX)
+        yield
+    finally:
+        fcntl.flock(fd.fileno(), fcntl.LOCK_UN)
+        fd.close()
+
+
+def load_services():
+    if not os.path.exists(SERVICES_FILE):
+        ensure_dirs()
+        with open(SERVICES_FILE, "w") as f:
+            json.dump({}, f, indent=2)
+        return {}
+    with open(SERVICES_FILE) as f:
+        return json.load(f)
+
+
+def save_services(d):
+    ensure_dirs()
+    tmp = SERVICES_FILE + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(d, f, indent=2, sort_keys=True)
+        f.write("\n")
+    os.replace(tmp, SERVICES_FILE)
+
+
+def read_lock_file(path):
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return None
+
+
+def write_lock_file(path, data):
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(data, f, indent=2)
+        f.write("\n")
+    os.replace(tmp, path)
+
+
+def all_locks():
+    out = []
+    if not os.path.isdir(LOCKS_DIR):
+        return out
+    for fn in sorted(os.listdir(LOCKS_DIR)):
+        if not fn.endswith(".json") or fn.endswith(".tmp"):
+            continue
+        d = read_lock_file(os.path.join(LOCKS_DIR, fn))
+        if d:
+            out.append(d)
+    return out
+
+
+def is_expired(d, t=None):
+    t = t if t is not None else now()
+    return t > d.get("expires_epoch", 0)
+
+
+def pid_alive(pid):
+    if not pid:
+        return False
+    try:
+        os.kill(pid, 0)
+        return True
+    except OSError as e:
+        return e.errno == errno.EPERM  # exists but not ours
+
+
+def port_bindable(port):
+    """Best-effort OS check: can we bind this TCP port right now?
+
+    Returns False if anything (an applock-launched app or an unrelated process)
+    is already holding it. Tests the wildcard address 0.0.0.0; a process bound
+    only to a specific interface could slip through, which is acceptable for a
+    dev-test tool. SO_REUSEADDR is intentionally left off so an active listener
+    registers as occupied.
+    """
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.bind(("0.0.0.0", port))
+        return True
+    except OSError:
+        return False
+    finally:
+        s.close()
+
+
+def prune_waiters(d, t=None):
+    """Drop waiter entries that haven't been refreshed recently. Returns the live dict."""
+    t = t if t is not None else now()
+    waiters = d.get("waiters") or {}
+    live = {k: v for k, v in waiters.items() if t - v.get("at", 0) <= WAITER_STALE_AFTER}
+    d["waiters"] = live
+    return live
+
+
+def register_demand(service, ports, waiter_id, waiter_owner):
+    """Stamp demand on every applock-held port the waiter is blocked behind. Under flock."""
+    t = now()
+    for port in ports:
+        path = lock_path(service, port)
+        d = read_lock_file(path)
+        if not d or is_expired(d, t):
+            continue
+        waiters = d.setdefault("waiters", {})
+        waiters[waiter_id] = {"owner": waiter_owner, "at": t}
+        prune_waiters(d, t)
+        write_lock_file(path, d)
+
+
+def clear_demand(service, ports, waiter_id):
+    """Remove a waiter's demand once it has acquired or given up. Under flock."""
+    for port in ports:
+        path = lock_path(service, port)
+        d = read_lock_file(path)
+        if not d:
+            continue
+        waiters = d.get("waiters") or {}
+        if waiter_id in waiters:
+            del waiters[waiter_id]
+            write_lock_file(path, d)
+
+
+def candidate_ports(service, override_port):
+    if override_port is not None:
+        return [override_port]
+    services = load_services()
+    if service not in services:
+        die(
+            f"service '{service}' is not in the ports dictionary ({SERVICES_FILE}).\n"
+            f"       Register it first:  applock add-service {service} <port> [<port>...]\n"
+            f"       or pass an explicit port:  applock run {service} --port <N> -- <cmd>"
+        )
+    ports = services[service]
+    if not ports:
+        die(f"service '{service}' has no ports configured in {SERVICES_FILE}")
+    return list(ports)
+
+
+# ----------------------------------------------------------------------------- acquire (one shot, under flock)
+def try_acquire_locked(service, ports, lease_id, owner, ttl, renew, command,
+                       renewer_pid=None, max_hold=DEFAULT_MAX_HOLD):
+    """Must be called inside registry_lock(). Returns chosen port or None."""
+    t = now()
+    for port in ports:
+        path = lock_path(service, port)
+        existing = read_lock_file(path)
+        if existing and not is_expired(existing, t):
+            continue  # genuinely held by another lease
+        # A port is only available if the OS socket is actually free — guards
+        # against processes that never went through applock (and against a stale
+        # lease whose app is somehow still bound).
+        if not port_bindable(port):
+            continue
+        if existing and is_expired(existing, t):
+            log(
+                f"port {port}: reclaiming stale lease of '{existing.get('owner')}' "
+                f"(expired {int(t - existing.get('expires_epoch', t))}s ago)"
+            )
+        data = {
+            "service": service,
+            "port": port,
+            "lease_id": lease_id,
+            "owner": owner,
+            "renewer_pid": renewer_pid,
+            "command": command,
+            "ttl": ttl,
+            "renew_interval": renew,
+            "acquired_at": iso(t),
+            "acquired_epoch": t,
+            "renewed_at": iso(t),
+            "expires_at": iso(t + ttl),
+            "expires_epoch": t + ttl,
+            "max_hold": max_hold,
+            "max_hold_at": iso(t + max_hold),
+            "max_hold_epoch": t + max_hold,
+            "waiters": {},
+        }
+        write_lock_file(path, data)
+        return port
+    return None
+
+
+def acquire_blocking(service, override_port, lease_id, owner, ttl, renew, command,
+                     wait_interval, wait_timeout, renewer_pid=None, max_hold=DEFAULT_MAX_HOLD):
+    """Loop until a port is free or wait_timeout (0 = forever) elapses.
+
+    While waiting, the waiter stamps its demand on the held leases (so the holder
+    can see it's blocking someone) and clears it on acquire or give-up.
+    """
+    ports = candidate_ports(service, override_port)
+    started = now()
+    announced = False
+    while True:
+        with registry_lock():
+            port = try_acquire_locked(service, ports, lease_id, owner, ttl, renew,
+                                      command, renewer_pid, max_hold)
+            if port is None:
+                register_demand(service, ports, lease_id, owner)
+        if port is not None:
+            with registry_lock():
+                clear_demand(service, ports, lease_id)
+            return port
+        elapsed = now() - started
+        if wait_timeout and elapsed >= wait_timeout:
+            with registry_lock():
+                clear_demand(service, ports, lease_id)
+            die(f"timed out after {wait_timeout}s waiting for a free port among {ports} for '{service}'", code=2)
+        if not announced:
+            # Distinguish "held by an applock lease" from "occupied by some other process".
+            t = now()
+            leased, external = [], []
+            for p in ports:
+                d = read_lock_file(lock_path(service, p))
+                if d and not is_expired(d, t):
+                    leased.append(p)
+                elif not port_bindable(p):
+                    external.append(p)
+            detail = []
+            if leased:
+                detail.append(f"lease-held {leased}")
+            if external:
+                detail.append(f"occupied by a non-applock process {external}")
+            why = "; ".join(detail) or "unavailable"
+            log(f"ports for '{service}' unavailable ({why}); waiting (poll every {wait_interval}s)…")
+            announced = True
+        # Never sleep past the deadline, or a long poll interval would overshoot a short timeout.
+        sleep_for = wait_interval
+        if wait_timeout:
+            sleep_for = min(wait_interval, max(0.5, wait_timeout - elapsed))
+        time.sleep(sleep_for)
+
+
+# ----------------------------------------------------------------------------- renewal
+def renew_once(service, port, lease_id):
+    """Renew the lease if we still own it and haven't hit the max-hold cap.
+
+    Returns a status dict:
+      status            "renewed" | "max_hold" | "lost"
+      waiters           [{owner, waited}] agents currently waiting on this port
+      max_hold_remaining seconds left until the hard cap (when renewed)
+    """
+    with registry_lock():
+        path = lock_path(service, port)
+        d = read_lock_file(path)
+        if not d or d.get("lease_id") != lease_id:
+            return {"status": "lost", "waiters": [], "max_hold_remaining": 0}
+        t = now()
+        if t >= d.get("max_hold_epoch", t + 1):
+            return {"status": "max_hold", "waiters": [], "max_hold_remaining": 0}
+        d["renewed_at"] = iso(t)
+        d["expires_at"] = iso(t + d["ttl"])
+        d["expires_epoch"] = t + d["ttl"]
+        live = prune_waiters(d, t)
+        write_lock_file(path, d)
+        waiters = sorted(
+            ({"owner": v.get("owner"), "waited": int(t - v.get("at", t))} for v in live.values()),
+            key=lambda w: -w["waited"],
+        )
+        return {"status": "renewed", "waiters": waiters,
+                "max_hold_remaining": int(d["max_hold_epoch"] - t)}
+
+
+def release_lease(service, port, lease_id, kill_renewer=True):
+    """Release only if we still own it. Optionally kill the detached renewer."""
+    with registry_lock():
+        path = lock_path(service, port)
+        d = read_lock_file(path)
+        if not d:
+            return
+        if d.get("lease_id") != lease_id:
+            log(f"not releasing {service}:{port} — owned by someone else now ({d.get('owner')})")
+            return
+        rpid = d.get("renewer_pid")
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            pass
+    if kill_renewer and rpid and rpid != os.getpid() and pid_alive(rpid):
+        with contextlib.suppress(OSError):
+            os.kill(rpid, signal.SIGTERM)
+
+
+# ----------------------------------------------------------------------------- subcommands
+def cmd_run(a):
+    if not a.command:
+        die("no command given. Usage: applock run <service> [opts] -- <cmd...>")
+    lease_id = uuid.uuid4().hex
+    owner = default_owner()
+    command_str = " ".join(a.command)
+    if a.renew > a.ttl:
+        die(f"renew interval ({a.renew}s) must be <= TTL ({a.ttl}s)")
+
+    port = acquire_blocking(
+        a.service, a.port, lease_id, owner, a.ttl, a.renew, command_str,
+        a.wait_interval, a.wait_timeout, renewer_pid=os.getpid(), max_hold=a.max_hold,
+    )
+    log(f"acquired {a.service}:{port}  lease={lease_id}  ttl={a.ttl}s renew={a.renew}s "
+        f"max-hold={a.max_hold}s")
+    log(f"running: {command_str}  (PORT={port})")
+
+    stop = threading.Event()
+    lost = threading.Event()
+    proc = {"p": None}
+    # Warn once when the hard cap is within this many seconds.
+    cap_warn_at = max(2 * a.renew, 300)
+    state = {"cap_warned": False, "had_waiters": False}
+
+    def stop_app(reason):
+        lost.set()
+        p = proc["p"]
+        if p and p.poll() is None:
+            with contextlib.suppress(OSError):
+                p.terminate()
+
+    def heartbeat():
+        while not stop.wait(a.renew):
+            res = renew_once(a.service, port, lease_id)
+            status = res["status"]
+            if status == "lost":
+                log(f"LOST lease {a.service}:{port} (reclaimed by another owner) — stopping app")
+                stop_app("lost")
+                return
+            if status == "max_hold":
+                log(f"MAX-HOLD reached on {a.service}:{port} ({a.max_hold}s) — releasing and stopping app")
+                stop_app("max_hold")
+                return
+            # status == "renewed": surface contention and the approaching cap to the agent.
+            waiters = res["waiters"]
+            if waiters:
+                who = ", ".join(w["owner"] for w in waiters[:3])
+                oldest = waiters[0]["waited"]
+                log(f"⚠ {len(waiters)} agent(s) WAITING for {a.service}:{port} "
+                    f"(oldest {oldest}s): {who} — release when you reach a good stopping point "
+                    f"(stop this task or `applock release {a.service} {port}`)")
+                state["had_waiters"] = True
+            elif state["had_waiters"]:
+                log(f"no more agents waiting for {a.service}:{port}")
+                state["had_waiters"] = False
+            rem = res["max_hold_remaining"]
+            if not state["cap_warned"] and rem <= cap_warn_at:
+                log(f"max-hold cap in {rem}s for {a.service}:{port} — wrap up or `applock extend {lease_id}`")
+                state["cap_warned"] = True
+
+    env = dict(os.environ)
+    env["PORT"] = str(port)
+    env["APPLOCK_PORT"] = str(port)
+    env["APPLOCK_SERVICE"] = a.service
+    env["APPLOCK_LEASE"] = lease_id
+
+    hb = threading.Thread(target=heartbeat, daemon=True)
+    hb.start()
+
+    rc = 1
+    try:
+        proc["p"] = subprocess.Popen(a.command, env=env)
+        rc = proc["p"].wait()
+    except KeyboardInterrupt:
+        if proc["p"] and proc["p"].poll() is None:
+            proc["p"].terminate()
+        rc = 130
+    finally:
+        stop.set()
+        release_lease(a.service, port, lease_id, kill_renewer=False)
+        log(f"released {a.service}:{port}")
+    if lost.is_set():
+        rc = rc or 1
+    sys.exit(rc)
+
+
+def cmd_acquire(a):
+    lease_id = uuid.uuid4().hex
+    owner = default_owner()
+    if a.renew > a.ttl:
+        die(f"renew interval ({a.renew}s) must be <= TTL ({a.ttl}s)")
+    port = acquire_blocking(
+        a.service, a.port, lease_id, owner, a.ttl, a.renew, a.command_label,
+        a.wait_interval, a.wait_timeout, renewer_pid=None, max_hold=a.max_hold,
+    )
+    # Detach a renewer process; record its pid in the lease.
+    logf = open(os.path.join(LOG_DIR, f"renew-{lease_id}.log"), "a")
+    renewer = subprocess.Popen(
+        [sys.executable, os.path.abspath(__file__), "__renew", lease_id,
+         "--service", a.service, "--port", str(port)],
+        stdout=logf, stderr=logf, stdin=subprocess.DEVNULL, start_new_session=True,
+    )
+    with registry_lock():
+        path = lock_path(a.service, port)
+        d = read_lock_file(path)
+        if d and d.get("lease_id") == lease_id:
+            d["renewer_pid"] = renewer.pid
+            write_lock_file(path, d)
+    log(f"acquired {a.service}:{port}  lease={lease_id}  renewer_pid={renewer.pid}  max-hold={a.max_hold}s")
+    log(f"release with:  applock release --lease {lease_id}")
+    print(json.dumps({"service": a.service, "port": port, "lease_id": lease_id,
+                      "renewer_pid": renewer.pid}))
+
+
+def cmd_renew(a):
+    # Internal detached heartbeat loop. Exits when the lease is lost/released or
+    # hits its max-hold cap. (It cannot kill a manually-started app, so on the cap
+    # it just drops the lease; the OS bind-check makes the next agent wait until
+    # the squatting app actually exits.)
+    service, port, lease_id = a.service, a.port, a.lease_id
+
+    def handle_term(*_):
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, handle_term)
+    # Read renew interval from the lease itself.
+    d = read_lock_file(lock_path(service, port))
+    interval = (d or {}).get("renew_interval", DEFAULT_RENEW)
+    while True:
+        time.sleep(interval)
+        res = renew_once(service, port, lease_id)
+        if res["status"] == "lost":
+            return
+        if res["status"] == "max_hold":
+            log(f"max-hold reached on {service}:{port} — dropping lease")
+            release_lease(service, port, lease_id, kill_renewer=False)
+            return
+
+
+def cmd_release(a):
+    if a.lease:
+        for d in all_locks():
+            if d.get("lease_id") == a.lease:
+                release_lease(d["service"], d["port"], a.lease)
+                log(f"released {d['service']}:{d['port']} (lease {a.lease})")
+                return
+        die(f"no lease found with id {a.lease}")
+    if a.service and a.port is not None:
+        d = read_lock_file(lock_path(a.service, a.port))
+        if not d:
+            die(f"no lease held on {a.service}:{a.port}")
+        release_lease(a.service, a.port, d["lease_id"])
+        log(f"released {a.service}:{a.port}")
+        return
+    die("usage: applock release <service> <port>   |   applock release --lease <id>")
+
+
+def cmd_waiters(a):
+    """Report how many agents are waiting on a service's port(s). Scriptable JSON."""
+    t = now()
+    out = []
+    for d in all_locks():
+        if a.service and d["service"] != a.service:
+            continue
+        if is_expired(d, t):
+            continue
+        w = prune_waiters(d, t)
+        out.append({
+            "service": d["service"],
+            "port": d["port"],
+            "owner": d["owner"],
+            "waiters": [{"owner": v.get("owner"), "waited": int(t - v.get("at", t))} for v in w.values()],
+        })
+    print(json.dumps(out, indent=2))
+
+
+def cmd_extend(a):
+    """Push a lease's max-hold cap out by N seconds (or set it to now+N)."""
+    target = None
+    for d in all_locks():
+        if d.get("lease_id") == a.lease:
+            target = d
+            break
+    if not target:
+        die(f"no lease found with id {a.lease}")
+    with registry_lock():
+        path = lock_path(target["service"], target["port"])
+        d = read_lock_file(path)
+        if not d or d.get("lease_id") != a.lease:
+            die(f"lease {a.lease} no longer held")
+        t = now()
+        base = d.get("max_hold_epoch", t) if not a.from_now else t
+        d["max_hold_epoch"] = base + a.seconds
+        d["max_hold_at"] = iso(d["max_hold_epoch"])
+        d["max_hold"] = int(d["max_hold_epoch"] - d.get("acquired_epoch", t))
+        write_lock_file(path, d)
+        remaining = int(d["max_hold_epoch"] - t)
+    log(f"extended {target['service']}:{target['port']} — max-hold now {remaining}s from now")
+
+
+def cmd_status(a):
+    locks = all_locks()
+    services = load_services()
+    t = now()
+    if a.json:
+        for d in locks:
+            d["expired"] = is_expired(d, t)
+            d["remaining"] = max(0, int(d.get("expires_epoch", 0) - t))
+        print(json.dumps({"services": services, "leases": locks}, indent=2))
+        return
+
+    held = {(d["service"], d["port"]): d for d in locks}
+    log(f"state dir: {HOME}")
+    print("\nSERVICES / PORTS")
+    if not services:
+        print("  (none registered — use: applock add-service <name> <port>...)")
+    for svc in sorted(services):
+        cells = []
+        for p in services[svc]:
+            d = held.get((svc, p))
+            if d and not is_expired(d, t):
+                rem = int(d["expires_epoch"] - t)
+                cells.append(f"{p}=HELD({d['owner']}, {rem}s left)")
+            elif d and is_expired(d, t):
+                cells.append(f"{p}=STALE({d['owner']})")
+            else:
+                cells.append(f"{p}=free")
+        print(f"  {svc:<20} {'  '.join(cells)}")
+
+    print("\nACTIVE LEASES")
+    if not locks:
+        print("  (none)")
+    for d in sorted(locks, key=lambda x: (x["service"], x["port"])):
+        rem = int(d.get("expires_epoch", 0) - t)
+        flag = "STALE" if is_expired(d, t) else f"{rem}s left"
+        cap = int(d.get("max_hold_epoch", 0) - t)
+        print(f"  {d['service']}:{d['port']:<6} {flag:<14} max-hold {cap}s left  "
+              f"owner={d['owner']}  lease={d['lease_id']}")
+        if d.get("command"):
+            print(f"      cmd: {d['command']}")
+        waiters = prune_waiters(d, t)
+        if waiters:
+            who = ", ".join(f"{v.get('owner')} ({int(t - v.get('at', t))}s)" for v in waiters.values())
+            print(f"      waiting: {len(waiters)} → {who}")
+    print()
+
+
+def cmd_services(a):
+    print(json.dumps(load_services(), indent=2, sort_keys=True))
+
+
+def cmd_add_service(a):
+    ports = [int(p) for p in a.ports]
+    with registry_lock():
+        services = load_services()
+        services[a.name] = ports
+        save_services(services)
+    log(f"registered service '{a.name}' -> ports {ports}")
+
+
+def cmd_gc(a):
+    t = now()
+    removed = 0
+    with registry_lock():
+        for d in all_locks():
+            if is_expired(d, t):
+                with contextlib.suppress(FileNotFoundError):
+                    os.remove(lock_path(d["service"], d["port"]))
+                    removed += 1
+    log(f"removed {removed} expired lease(s)")
+
+
+# ----------------------------------------------------------------------------- argparse
+def build_parser():
+    p = argparse.ArgumentParser(prog="applock", description="single-host (service, port) lease manager")
+    sub = p.add_subparsers(dest="cmd", required=True)
+
+    def add_lease_opts(sp):
+        sp.add_argument("--port", type=int, default=None, help="force a specific port (bypasses the dictionary)")
+        sp.add_argument("--ttl", type=int, default=DEFAULT_TTL, help=f"lease TTL seconds (default {DEFAULT_TTL})")
+        sp.add_argument("--renew", type=int, default=DEFAULT_RENEW, help=f"renew interval seconds (default {DEFAULT_RENEW})")
+        sp.add_argument("--wait-interval", type=int, default=DEFAULT_WAIT_INTERVAL, help=f"poll seconds while waiting (default {DEFAULT_WAIT_INTERVAL})")
+        sp.add_argument("--wait-timeout", type=int, default=0, help="max seconds to wait for a free port (0 = forever)")
+        sp.add_argument("--max-hold", type=int, default=DEFAULT_MAX_HOLD, help=f"hard cap seconds the lease may be held (default {DEFAULT_MAX_HOLD})")
+
+    sp = sub.add_parser("run", help="acquire, run a command with $PORT set, renew, release on exit")
+    sp.add_argument("service")
+    add_lease_opts(sp)
+    # The command is split off manually in main() at the first "--", so option
+    # flags placed before "--" parse correctly (argparse.REMAINDER would eat them).
+    sp.set_defaults(func=cmd_run, command=[])
+
+    sp = sub.add_parser("acquire", help="acquire a lease and detach a renewer (manual release required)")
+    sp.add_argument("service")
+    add_lease_opts(sp)
+    sp.add_argument("--name", dest="command_label", default="(manual acquire)", help="label stored as the lease command")
+    sp.set_defaults(func=cmd_acquire)
+
+    sp = sub.add_parser("release", help="release a lease")
+    sp.add_argument("service", nargs="?")
+    sp.add_argument("port", nargs="?", type=int)
+    sp.add_argument("--lease", help="release by lease id")
+    sp.set_defaults(func=cmd_release)
+
+    sp = sub.add_parser("status", help="show leases and per-service availability")
+    sp.add_argument("service", nargs="?")
+    sp.add_argument("--json", action="store_true")
+    sp.set_defaults(func=cmd_status)
+
+    sp = sub.add_parser("waiters", help="report how many agents are waiting on a service (JSON)")
+    sp.add_argument("service", nargs="?")
+    sp.set_defaults(func=cmd_waiters)
+
+    sp = sub.add_parser("extend", help="push a lease's max-hold cap further out")
+    sp.add_argument("lease", help="lease id to extend")
+    sp.add_argument("seconds", nargs="?", type=int, default=DEFAULT_MAX_HOLD,
+                    help=f"seconds to add to the cap (default {DEFAULT_MAX_HOLD})")
+    sp.add_argument("--from-now", action="store_true",
+                    help="set the cap to now+seconds instead of adding to the existing cap")
+    sp.set_defaults(func=cmd_extend)
+
+    sp = sub.add_parser("services", help="print the ports dictionary")
+    sp.set_defaults(func=cmd_services)
+
+    sp = sub.add_parser("add-service", help="register/replace a service's allowed ports")
+    sp.add_argument("name")
+    sp.add_argument("ports", nargs="+")
+    sp.set_defaults(func=cmd_add_service)
+
+    sp = sub.add_parser("gc", help="delete expired lease files")
+    sp.set_defaults(func=cmd_gc)
+
+    sp = sub.add_parser("__renew", help=argparse.SUPPRESS)
+    sp.add_argument("lease_id")
+    sp.add_argument("--service", required=True)
+    sp.add_argument("--port", type=int, required=True)
+    sp.set_defaults(func=cmd_renew)
+
+    return p
+
+
+def main():
+    argv = sys.argv[1:]
+    # For `run`, everything after the FIRST "--" is the command to execute; parse
+    # only the head as options. (A second "--" inside the command is preserved.)
+    command = None
+    if argv and argv[0] == "run" and "--" in argv:
+        idx = argv.index("--")
+        argv, command = argv[:idx], argv[idx + 1:]
+    args = build_parser().parse_args(argv)
+    if command is not None:
+        args.command = command
+    ensure_dirs()
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()
