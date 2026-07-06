@@ -1,6 +1,7 @@
 [alias]
 	pl = pull
 	ps = push
+	psf = push --force-with-lease
 	cm = commit -m
 	s = status
 	ch = checkout
