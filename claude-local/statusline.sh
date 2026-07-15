@@ -1,6 +1,7 @@
 #!/bin/bash
 input=$(cat)
 MODEL=$(echo "$input" | jq -r '.model.display_name // "unknown"')
+EFFORT=$(echo "$input" | jq -r '.effort.level // empty')
 DIR=$(echo "$input" | jq -r '.workspace.current_dir // .cwd // ""')
 USED=$(echo "$input" | jq -r '
   .context_window.current_usage as $u |
@@ -25,7 +26,12 @@ case "$DIR" in
   "$HOME"/*) DISPLAY_DIR="~${DIR#$HOME}" ;;
   *) DISPLAY_DIR="$DIR" ;;
 esac
-TEXT="📁 ${DISPLAY_DIR} [$MODEL] Context: $(fmt_tokens "$USED") / $(fmt_tokens "$TOTAL") (${PCT}%)"
+if [ -n "$EFFORT" ]; then
+  MODEL_LABEL="$MODEL · $EFFORT"
+else
+  MODEL_LABEL="$MODEL"
+fi
+TEXT="📁 ${DISPLAY_DIR} [$MODEL_LABEL] Context: $(fmt_tokens "$USED") / $(fmt_tokens "$TOTAL") (${PCT}%)"
 if [ "$USED" -ge 250000 ]; then
   echo -e "\033[31m${TEXT}\033[0m"
 else
