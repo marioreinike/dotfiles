@@ -37,5 +37,12 @@
       "METABASE_URL": "https://metabase-production-2bb0.up.railway.app",
       "METABASE_API_KEY": "# REDACTED - set this manually"
     }
+  },
+  "vambe-product-os": {
+    "type": "http",
+    "url": "https://product.vambe.org/api/mcp",
+    "headers": {
+      "Authorization": "# REDACTED - set this manually"
+    }
   }
 }
