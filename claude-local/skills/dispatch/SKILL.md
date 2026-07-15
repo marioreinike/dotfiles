@@ -27,27 +27,28 @@ REMOTE_FLAG=""                                                   # only if the u
 ```
 Never launch plain `claude` (no auto mode, no name).
 
-**Seeding a task prompt (optional) — the agent starts working on launch instead of idling.** Only when the user gave a **detailed objective**; without one, launch idle. The prompt is passed as a **positional argument read from a file**, so multi-line text, quotes, `$`, and backticks pass through verbatim (command-substitution output is a single argument, never re-parsed) — no `send-keys` escaping games:
+**Seeding the launch prompt — always, not just when there's a task.** Every launch writes a prompt file, even with no objective: a workspace directory can hold worktrees for repos this dispatch never touches (other features parked there), so the agent needs to be told up front which subdirectories are in scope and which to leave alone. The prompt is passed as a **positional argument read from a file**, so multi-line text, quotes, `$`, and backticks pass through verbatim (command-substitution output is a single argument, never re-parsed) — no `send-keys` escaping games:
 ```bash
 mkdir -p "$HOME/.cache/dispatch"
 PROMPT_FILE="$HOME/.cache/dispatch/${SESSION}.prompt"
-# Write the composed prompt to $PROMPT_FILE with the Write tool (multi-line, no escaping).
-# Compose it from the objective PLUS the scope you resolved — the repos in play, the branch each is
-# on and the base it forked from, and the working dir — so the agent knows its boundaries.
+# Always write, with the Write tool:
+#  - the repos in scope for THIS session: alias, branch, base it forked from
+#  - if other worktrees exist in this workspace dir for repos not requested, name them
+#    explicitly and say they belong to unrelated work — do not explore or modify them
+#  - the objective, if the user gave one; otherwise say the agent should wait for instructions
 ```
 
-Launch — **seeded** (objective given) vs **idle** (none). `\$(cat …)` is escaped so the *pane's* shell expands it, not the dispatcher's:
+Launch always sends the prompt file (never a bare empty invocation) — call it **seeded** (has an objective) vs **scoped** (no objective, just the repo-focus note, agent waits for a human). `\$(cat …)` is escaped so the *pane's* shell expands it, not the dispatcher's:
 ```bash
-# seeded — agent starts immediately on the prompt:
 tmux send-keys -t "$SESSION" "claude --permission-mode auto --name \"$SESSION\"$MODEL_FLAG$REMOTE_FLAG \"\$(cat $PROMPT_FILE)\"" Enter
-# idle — empty prompt, waits for a human:
-tmux send-keys -t "$SESSION" "claude --permission-mode auto --name \"$SESSION\"$MODEL_FLAG$REMOTE_FLAG" Enter
 ```
 The prompt file is named per session and overwritten on re-dispatch; harmless to leave under `~/.cache/dispatch/`.
 
 ## Freeness rule
 
 A workspace is **FREE** when *every* worktree in it is clean (no uncommitted/untracked changes) **and** 0 commits ahead of its base branch (any work is already merged). Branch name is ignored — a worktree parked on a merged `feat/*` branch is still free. Workspaces with no worktrees are free (empty).
+
+**Freeness is scoped exclusively to the repos this dispatch will use.** A workspace can hold worktrees for aliases unrelated to the current request (leftover from other features). Those don't count against — or for — this decision at all: ignore them entirely when judging whether the workspace works for this dispatch. Only the worktrees matching the requested aliases matter; if each of those is either FREE or absent, the workspace qualifies regardless of what `ws-scan.sh`'s overall verdict says (that verdict considers every worktree, including irrelevant ones). Concretely: run the full report (not `--free`), then for each candidate workspace check only the rows whose alias is in the requested set.
 
 ---
 
@@ -62,6 +63,8 @@ For "status of my workspaces", "which workspaces are free", "anything unmerged",
 
 Present a tidy summary: list **FREE** workspaces first, then **OCCUPIED** ones and *why* (which worktree is dirty, or on an unmerged branch — show branch + ahead/behind). Scan is offline; if the user needs the absolute latest, mention they can `git fetch` the repos first.
 
+For a **fuller per-repo detail view** instead (branch/base/ahead/behind/tree columns per repo, grouped by workspace), use the separate `repo-status` skill — it wraps this same `ws-scan.sh`, so it's always in sync.
+
 ---
 
 ## Mode: PREPARE
@@ -71,17 +74,19 @@ For "prepare a new feature", "start feature X touching backend+frontend", "spin 
 ### 1. Collect inputs
 - **feature** — the branch/slug. If it contains `/`, use it verbatim as the branch; otherwise the branch is `feat/<feature>`. The **slug** is the part after the last `/`.
 - **repos** — the aliases being touched (e.g. `backend frontend`). If not given, ask.
-- **objective** (optional) — a detailed task for the agent. If given, it's seeded so the session starts working on launch (see **Launch command**); compose the final prompt from this plus the repo scope resolved in step 4. If absent, the session launches idle.
+- **objective** (optional) — a detailed task for the agent. Whether given or not, the session is always seeded with the repo scope resolved in step 4 (see **Launch command**); if an objective is given it's appended so the agent starts working immediately, otherwise the agent waits after being told its scope.
 - **model** (optional) — a model alias or ID to run the session under (`--model`). If absent, inherits the default.
 
 ### 2. Pick a free workspace
 ```bash
-"${CLAUDE_SKILL_DIR}/scripts/ws-scan.sh" --free
+"${CLAUDE_SKILL_DIR}/scripts/ws-scan.sh"
 ```
-If none are free → report status and stop. Otherwise prefer a free workspace that **already contains worktrees for all requested aliases** (fewest worktrees to create); break ties by lowest number. Set `WS` to its name.
+Judge freeness **scoped to the requested aliases only** (see Freeness rule above) — for each workspace, look only at the rows whose alias is in the requested set; ignore rows for other aliases entirely, even if they make the workspace's overall verdict OCCUPIED. A workspace qualifies if every requested-alias row is FREE or absent.
+
+If none qualify → report status and stop. Otherwise prefer a qualifying workspace that **already contains worktrees for all requested aliases** (fewest worktrees to create); break ties by lowest number. Set `WS` to its name. If the workspace also holds unrelated worktrees (aliases outside the requested set, possibly BUSY), note them — they'll need callout in the launch prompt (step 6) so the agent doesn't touch them.
 
 ### 3. Confirm the plan (REQUIRED before any mutation)
-Show: chosen workspace, branch name, session name `${WS}-<slug>` (sanitize `/ : .` → `-`), the base branch per repo, which aliases already have a worktree vs. which will be **created**, the **model** (if any), and whether the session will be **seeded** with the objective or launch idle. Wait for the user to confirm.
+Show: chosen workspace, branch name, session name `${WS}-<slug>` (sanitize `/ : .` → `-`), the base branch per repo, which aliases already have a worktree vs. which will be **created**, any unrelated worktrees in the workspace that will be called out as off-limits, the **model** (if any), and whether the session will be **seeded** with the objective or just the scope note. Wait for the user to confirm.
 
 ### 4. Create branches per touched alias
 Resolve each alias from `repos.conf`:
@@ -118,18 +123,18 @@ SESSION="${WS}-${SLUG}"   # already sanitized
 tmux has-session -t "$SESSION" 2>/dev/null && SESSION="${SESSION}-2"   # avoid clash
 tmux new-session -d -s "$SESSION" -c "$HOME/WORKSPACES/$WS"
 ```
-Then assemble `MODEL_FLAG`/`REMOTE_FLAG` and launch per **Launch command (all modes)** above. If the user gave an objective, first write it — plus the per-repo branch/base scope from step 4 and the workspace path — to `$PROMPT_FILE` and use the **seeded** launch so the agent starts immediately; otherwise use the **idle** launch.
+Then assemble `MODEL_FLAG`/`REMOTE_FLAG`. Always write `$PROMPT_FILE` with the per-repo branch/base scope from step 4, the workspace path, and — if any unrelated worktrees share this workspace — their aliases flagged as off-limits; if the user gave an objective, append it so the agent starts working immediately, otherwise close with an instruction to wait for a human. Launch per **Launch command (all modes)** above.
 
 Do **not** auto-attach. Tell the user to run: `tmux attach -t "$SESSION"`.
 
 ### 7. Report
-Summarize: workspace, session name + attach command, and per repo the branch created, base it forked from, whether the worktree was created or reused, and any env files copied or still pending.
+Summarize: workspace, session name + attach command, and per repo the branch created, base it forked from, whether the worktree was created or reused, and any env files copied or still pending. Note any unrelated worktrees in the workspace flagged as off-limits to the agent.
 
 ---
 
 ## Mode: REPO (no worktree)
 
-For "dispatch a session in <repo>", "spin up Claude inside backend (no worktree)", "just launch Claude in the repo". No workspace, no worktree, no branch forking — just a tmux session running Claude in the canonical clone at `~/REPOS/<repo>`. As in PREPARE, accept an optional **model** and **objective** — if an objective is given the session is seeded so the agent starts immediately (see **Launch command**).
+For "dispatch a session in <repo>", "spin up Claude inside backend (no worktree)", "just launch Claude in the repo". No workspace, no worktree, no branch forking — just a tmux session running Claude in the canonical clone at `~/REPOS/<repo>`. As in PREPARE, accept an optional **model** and **objective** — if an objective is given it's appended to the seeded scope note so the agent starts immediately (see **Launch command**).
 
 ### 1. Resolve the repo dir
 Accept an **alias** (resolved via `repos.conf`) or a bare repo/dir name:
@@ -142,7 +147,7 @@ REPO="$HOME/REPOS/$repo"
 If `$REPO` isn't an existing git repo, report it and stop.
 
 ### 2. Confirm (REQUIRED before launching)
-Show: the repo dir, its current branch, the session name, the **model** (if any), and whether the session is **seeded** with an objective or idle. Branch handling: stay on the **current branch by default**. Only create/switch a branch if the user explicitly asked — there's no worktree isolation here, so a checkout mutates the working clone. Wait for confirmation.
+Show: the repo dir, its current branch, the session name, the **model** (if any), and whether the session is **seeded** with an objective or just the scope note. Branch handling: stay on the **current branch by default**. Only create/switch a branch if the user explicitly asked — there's no worktree isolation here, so a checkout mutates the working clone. Wait for confirmation.
 
 ### 3. Launch the Claude session (detached)
 ```bash
@@ -150,7 +155,7 @@ SESSION="$repo"   # named exactly as the repo; sanitize / : . → -
 tmux has-session -t "$SESSION" 2>/dev/null && SESSION="${SESSION}-2"   # avoid clash
 tmux new-session -d -s "$SESSION" -c "$REPO"
 ```
-Then assemble `MODEL_FLAG`/`REMOTE_FLAG` and launch per **Launch command (all modes)** above. If the user gave an objective, first write it — plus the repo dir and the branch it's on — to `$PROMPT_FILE` and use the **seeded** launch; otherwise use the **idle** launch.
+Then assemble `MODEL_FLAG`/`REMOTE_FLAG`. Always write `$PROMPT_FILE` with the repo dir and the branch it's on; if the user gave an objective, append it so the agent starts working immediately, otherwise close with an instruction to wait for a human. Launch per **Launch command (all modes)** above.
 
 Do **not** auto-attach. Tell the user: `tmux attach -t "$SESSION"`.
 
