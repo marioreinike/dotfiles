@@ -45,8 +45,14 @@ echo "$raw" | awk '
     if (s == "FREE") return "\033[30;42m" padded "\033[0m"
     return "\033[97;41m" padded "\033[0m"
   }
+  function colorstatus_right(s,   plain) {
+    plain = s
+    if (s == "FREE") return "\033[30;42m" plain "\033[0m"
+    return "\033[97;41m" plain "\033[0m"
+  }
   BEGIN {
     nws = 0
+    HDRWIDTH = length(sprintf("%s %s %s %s %s %s %s", pad("repo",12), pad("status",6), pad("branch",30), pad("base",12), pad("ahead",5), pad("behind",6), pad("tree",10)))
   }
   /^=== / {
     wsname = $2
@@ -78,7 +84,13 @@ echo "$raw" | awk '
   END {
     for (i = 0; i < nws; i++) {
       wsname = wslist[i]
-      printf "\n[%s] %s\n", wsname, colorstatus(wsverdict[wsname], 4)
+      prefix = sprintf("[%s]", wsname)
+      verdict = wsverdict[wsname]
+      gap = HDRWIDTH - length(prefix) - length(verdict)
+      if (gap < 1) gap = 1
+      spacer = ""
+      for (k = 0; k < gap; k++) spacer = spacer " "
+      printf "\n%s%s%s\n", prefix, spacer, colorstatus_right(verdict)
       hdr = sprintf("%s %s %s %s %s %s %s", pad("repo",12), pad("status",6), pad("branch",30), pad("base",12), pad("ahead",5), pad("behind",6), pad("tree",10))
       print hdr
       for (k = 0; k < length(hdr); k++) printf "-"
