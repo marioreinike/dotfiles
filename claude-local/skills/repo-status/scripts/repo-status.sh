@@ -5,7 +5,9 @@
 # Wraps dispatch's ws-scan.sh (same repos.conf / workspaces root) and
 # reformats its per-workspace report into one table per workspace, one row
 # per repo alias in it, so you can scan a workspace's full repo detail (and
-# which repos are free) in aligned columns. Freeness rule and
+# which repos are free) in aligned columns. Each workspace header also shows
+# an overall FREE/BUSY verdict (FREE only when every repo in it is free,
+# straight from ws-scan.sh's own verdict). Freeness rule and
 # offline-comparison caveat are identical to ws-scan.sh — see its --help.
 #
 # Usage:
@@ -38,11 +40,18 @@ echo "$raw" | awk '
     while (length(s) < n) s = s " "
     return s
   }
+  function colorstatus(s, n,   padded) {
+    padded = pad(s, n)
+    if (s == "FREE") return "\033[30;42m" padded "\033[0m"
+    return "\033[97;41m" padded "\033[0m"
+  }
   BEGIN {
     nws = 0
   }
   /^=== / {
     wsname = $2
+    verdict = ($4 == "FREE") ? "FREE" : "BUSY"
+    wsverdict[wsname] = verdict
     if (!(wsname in seenws)) { seenws[wsname] = 1; wslist[nws++] = wsname }
     next
   }
@@ -69,7 +78,7 @@ echo "$raw" | awk '
   END {
     for (i = 0; i < nws; i++) {
       wsname = wslist[i]
-      printf "\n[%s]\n", wsname
+      printf "\n[%s] workspace: %s\n", wsname, colorstatus(wsverdict[wsname], 4)
       hdr = sprintf("%s %s %s %s %s %s %s", pad("repo",12), pad("status",6), pad("branch",30), pad("base",12), pad("ahead",5), pad("behind",6), pad("tree",10))
       print hdr
       for (k = 0; k < length(hdr); k++) printf "-"
@@ -89,7 +98,7 @@ echo "$raw" | awk '
         key = wsname SUBSEP alias
         status = (state_[key] == "free") ? "FREE" : "BUSY"
         printf "%s %s %s %s %s %s %s\n", \
-          pad(alias,12), pad(status,6), pad(trunc(branch_[key],30),30), \
+          pad(alias,12), colorstatus(status,6), pad(trunc(branch_[key],30),30), \
           pad(trunc(base_[key],12),12), pad(ahead_[key],5), pad(behind_[key],6), \
           pad(dirtylabel(dirty_[key]),10)
       }
