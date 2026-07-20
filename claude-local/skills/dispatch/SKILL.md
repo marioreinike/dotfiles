@@ -1,7 +1,7 @@
 ---
 name: dispatch
-description: Workspace dispatcher for git worktrees. Find a free workspace, prepare a new feature (fork branches across the repos you're touching) and launch a Claude session in tmux; launch a Claude session directly inside a repo clone (no worktree); or report the status of all workspaces (which are free, which still hold unfinished/unmerged work). Use when asked to start/prepare a feature, spin up a workspace, dispatch work in a repo, or check workspace/worktree status. Keywords - dispatch, dispatcher, workspace, worktree, no worktree, in repo, prepare feature, new feature, free workspace, spin up, ws status, seed prompt, starting prompt, run with model, specific model.
-argument-hint: status | prepare <feature> in <repos…> [with <model>] [: <objective>] | repo <alias> [with <model>] [: <objective>]
+description: Workspace dispatcher for git worktrees. Find a free workspace, prepare a new feature (fork branches across the repos you're touching) and launch a Claude session in tmux; report the status of all workspaces (which are free, which still hold unfinished/unmerged work); or, only when explicitly asked for bare/no-worktree, launch a Claude session directly inside a repo clone. Defaults to the workspace/worktree flow (PREPARE) — bare REPO mode requires explicit request. Use when asked to start/prepare a feature, spin up a workspace, dispatch work in a repo, or check workspace/worktree status. Keywords - dispatch, dispatcher, workspace, worktree, bare, no worktree, prepare feature, new feature, free workspace, spin up, ws status, seed prompt, starting prompt, run with model, specific model.
+argument-hint: status | prepare <feature> in <repos…> [with <model>] [: <objective>] | repo <alias> bare [with <model>] [: <objective>]
 allowed-tools: Bash, Read, Edit, Write, AskUserQuestion
 ---
 
@@ -15,6 +15,8 @@ You manage Mario's worktree-based workflow across two roots:
 The alias → repo → base-branch map lives in `${CLAUDE_SKILL_DIR}/repos.conf` (whitespace table). Repos not listed fall back to their `origin/HEAD` default branch. Add a row when you adopt a new alias.
 
 Three modes — **status** (read-only), **prepare** (worktree-based, mutating, always confirm first), and **repo** (launch a session directly inside a `~/REPOS/<repo>` clone, no worktree).
+
+**Mode selection defaults to PREPARE.** When asked to dispatch/launch a session for one or more repos, use PREPARE (workspace + worktree) unless the user's wording explicitly asks for bare/no-worktree — e.g. "bare", "no worktree", "directly in the repo clone", "without a worktree". Casual phrasing like "dispatch backend" or "spin up a session in backend" is PREPARE, not REPO. Only fall back to REPO mode on that explicit signal.
 
 **Launch command (all modes).** Every Claude session starts in auto mode with its display name (`--name`) set to the tmux session (`$SESSION`). Two optional additions, assembled into flags once and reused by both launch modes:
 
@@ -134,7 +136,7 @@ Summarize: workspace, session name + attach command, and per repo the branch cre
 
 ## Mode: REPO (no worktree)
 
-For "dispatch a session in <repo>", "spin up Claude inside backend (no worktree)", "just launch Claude in the repo". No workspace, no worktree, no branch forking — just a tmux session running Claude in the canonical clone at `~/REPOS/<repo>`. As in PREPARE, accept an optional **model** and **objective** — if an objective is given it's appended to the seeded scope note so the agent starts immediately (see **Launch command**).
+For explicit bare requests only — "dispatch backend bare", "spin up Claude inside backend, no worktree", "just launch Claude directly in the repo clone". No workspace, no worktree, no branch forking — just a tmux session running Claude in the canonical clone at `~/REPOS/<repo>`. As in PREPARE, accept an optional **model** and **objective** — if an objective is given it's appended to the seeded scope note so the agent starts immediately (see **Launch command**).
 
 ### 1. Resolve the repo dir
 Accept an **alias** (resolved via `repos.conf`) or a bare repo/dir name:
