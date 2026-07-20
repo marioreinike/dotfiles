@@ -48,7 +48,7 @@ The prompt file is named per session and overwritten on re-dispatch; harmless to
 
 A workspace is **FREE** when *every* worktree in it is clean (no uncommitted/untracked changes) **and** 0 commits ahead of its base branch (any work is already merged). Branch name is ignored — a worktree parked on a merged `feat/*` branch is still free. Workspaces with no worktrees are free (empty).
 
-**Freeness is scoped exclusively to the repos this dispatch will use.** A workspace can hold worktrees for aliases unrelated to the current request (leftover from other features). Those don't count against — or for — this decision at all: ignore them entirely when judging whether the workspace works for this dispatch. Only the worktrees matching the requested aliases matter; if each of those is either FREE or absent, the workspace qualifies regardless of what `ws-scan.sh`'s overall verdict says (that verdict considers every worktree, including irrelevant ones). Concretely: run the full report (not `--free`), then for each candidate workspace check only the rows whose alias is in the requested set.
+A workspace qualifies for a new dispatch only when `ws-scan.sh`'s overall verdict is FREE — i.e. **every** worktree in it is free, not just the ones matching the requested aliases. A workspace holding unrelated BUSY worktrees (leftover from other features) does not qualify, even if all the requested aliases themselves would be free.
 
 ---
 
@@ -79,11 +79,11 @@ For "prepare a new feature", "start feature X touching backend+frontend", "spin 
 
 ### 2. Pick a free workspace
 ```bash
-"${CLAUDE_SKILL_DIR}/scripts/ws-scan.sh"
+"${CLAUDE_SKILL_DIR}/scripts/ws-scan.sh" --free
 ```
-Judge freeness **scoped to the requested aliases only** (see Freeness rule above) — for each workspace, look only at the rows whose alias is in the requested set; ignore rows for other aliases entirely, even if they make the workspace's overall verdict OCCUPIED. A workspace qualifies if every requested-alias row is FREE or absent.
+Only workspaces in the FREE list qualify (see Freeness rule above — the whole workspace must be free, not just the requested aliases).
 
-If none qualify → report status and stop. Otherwise prefer a qualifying workspace that **already contains worktrees for all requested aliases** (fewest worktrees to create); break ties by lowest number. Set `WS` to its name. If the workspace also holds unrelated worktrees (aliases outside the requested set, possibly BUSY), note them — they'll need callout in the launch prompt (step 6) so the agent doesn't touch them.
+If none qualify → report status and stop. Otherwise prefer a qualifying workspace that **already contains worktrees for all requested aliases** (fewest worktrees to create); break ties by lowest number. Set `WS` to its name. If the workspace also holds unrelated worktrees (aliases outside the requested set), note them — they'll need callout in the launch prompt (step 6) so the agent doesn't touch them.
 
 ### 3. Confirm the plan (REQUIRED before any mutation)
 Show: chosen workspace, branch name, session name `${WS}-<slug>` (sanitize `/ : .` → `-`), the base branch per repo, which aliases already have a worktree vs. which will be **created**, any unrelated worktrees in the workspace that will be called out as off-limits, the **model** (if any), and whether the session will be **seeded** with the objective or just the scope note. Wait for the user to confirm.
