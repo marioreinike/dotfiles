@@ -90,7 +90,7 @@ echo "$raw" | awk '
       if (gap < 1) gap = 1
       spacer = ""
       for (k = 0; k < gap; k++) spacer = spacer " "
-      printf "\n%s%s%s\n", prefix, spacer, colorstatus_right(verdict)
+      printf "\n\033[48;5;238m%s%s\033[0m%s\n", prefix, spacer, colorstatus_right(verdict)
       hdr = sprintf("%s %s %s %s %s %s %s", pad("repo",12), pad("status",6), pad("branch",30), pad("base",12), pad("ahead",5), pad("behind",6), pad("tree",10))
       print hdr
       for (k = 0; k < length(hdr); k++) printf "-"
