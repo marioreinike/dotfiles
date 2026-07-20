@@ -172,6 +172,9 @@ hash -d w=~/WORKSPACES
 # Quick navigate to git worktree by branch name
 cdwt() { cd "$(git worktree list | grep "$1" | awk '{print $1}')" }
 
+# Per-workspace repo freeness snapshot (branch/base/ahead/behind/tree)
+alias repostatus="$HOME/.claude/skills/repo-status/scripts/repo-status.sh"
+
 alias cla="claude --enable-auto-mode"
 alias clb="claude --dangerously-skip-permissions"
 alias cld="cd ~/REPOS/dotfiles && claude --dangerously-skip-permissions"
