@@ -87,6 +87,8 @@ Only workspaces in the FREE list qualify (see Freeness rule above — the whole 
 
 If none qualify → report status and stop. Otherwise prefer a qualifying workspace that **already contains worktrees for all requested aliases** (fewest worktrees to create); break ties by lowest number. Set `WS` to its name. If the workspace also holds unrelated worktrees (aliases outside the requested set), note them — they'll need callout in the launch prompt (step 6) so the agent doesn't touch them.
 
+**Hard cap: 9 workspaces (`ws1`–`ws9`), never more.** Never create a new `wsN` directory to work around a lack of free workspaces — `~/WORKSPACES` is capped at `ws1..ws9`, all managed manually by Mario. If every existing workspace is BUSY, dispatch **must fail**: report full status (which workspace, which repo, why it's busy) and stop. Do not fall back to creating `ws10` or higher.
+
 ### 3. Confirm the plan (REQUIRED before any mutation)
 Show: chosen workspace, branch name, session name `${WS}-<slug>` (sanitize `/ : .` → `-`), the base branch per repo, which aliases already have a worktree vs. which will be **created**, any unrelated worktrees in the workspace that will be called out as off-limits, the **model** (if any), and whether the session will be **seeded** with the objective or just the scope note. Wait for the user to confirm.
 

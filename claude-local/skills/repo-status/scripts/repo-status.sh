@@ -78,7 +78,7 @@ echo "$raw" | awk '
   END {
     for (i = 0; i < nws; i++) {
       wsname = wslist[i]
-      printf "\n[%s] workspace: %s\n", wsname, colorstatus(wsverdict[wsname], 4)
+      printf "\n[%s] %s\n", wsname, colorstatus(wsverdict[wsname], 4)
       hdr = sprintf("%s %s %s %s %s %s %s", pad("repo",12), pad("status",6), pad("branch",30), pad("base",12), pad("ahead",5), pad("behind",6), pad("tree",10))
       print hdr
       for (k = 0; k < length(hdr); k++) printf "-"
