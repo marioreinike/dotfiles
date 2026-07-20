@@ -155,6 +155,67 @@ tmux split-window -v -t <target> -c "$(tmux display-message -t <target> -p '#{pa
   ```
 - To find the new pane's target, re-run Step 1 after creating it
 
+## Step 9: Run a command and capture its output (blocking run-and-wait)
+
+Run a command in a visible pane the way the Bash tool runs one — stream it live
+so the user watches it, but block until it finishes and get its full output and
+exit code back.
+
+### The easy way: the `tmux-run` helper
+
+A `tmux-run` shell function (defined in `~/.zshrc`) does the whole thing in one
+blocking call — it returns only when the command has finished, prints the
+command's full output, and its own exit status is the command's exit code:
+
+```bash
+tmux-run <session:window.pane> <command...>
+```
+
+It is event-driven (via `tmux wait-for`), so there is no polling loop to manage
+and no manual Monitor-polling needed.
+
+**Invoking it as the agent:** the Bash tool's shell does NOT load `~/.zshrc`, so
+`tmux-run` is undefined there. Call it through a zsh that sources the function,
+and pass the whole command as a single quoted argument:
+
+```bash
+zsh -c 'source ~/.zshrc >/dev/null 2>&1; tmux-run <session:window.pane> "<command>"'
+```
+
+Run that in the **foreground** for short commands. For long-running ones, use the
+Bash tool's **background** mode and read the output when the completion
+notification fires — either way you get the full output and the command's exit
+code back when it returns.
+
+### How it works (the underlying mechanism)
+
+The command is sent with `tee` (output shows live in the pane AND is saved to a
+file), its exit code is written to a `.rc` file, and the pane signals a unique
+`tmux wait-for` channel when done; the caller blocks on that channel:
+
+```bash
+id=...   # unique per run, e.g. $$-$RANDOM
+tmux send-keys -t <target> \
+  "( <command> ) 2>&1 | tee /tmp/run.$id.log ; echo \${pipestatus[1]} > /tmp/run.$id.rc ; tmux wait-for -S tr-$id" Enter
+tmux wait-for tr-$id                       # blocks until the pane signals — no polling
+cat /tmp/run.$id.log ; cat /tmp/run.$id.rc # output, then exit code
+```
+
+Key points:
+- **`tee`, not `>`** — a plain `> file` redirect hides output from the pane. `tee`
+  gives both: live in the pane (user-friendly) and a clean file copy. The pane
+  wraps long lines and has limited scrollback, so consume the file, not the pane.
+- **Wrap compound commands** — `( cmd1; cmd2 )` so the whole sequence is captured,
+  not just the last segment. (Piping to `tee` runs it in a subshell, so `cd`/env
+  changes won't persist in the pane.)
+- **Exit code through a pipe** — after `| tee`, plain `$?` is tee's status; use
+  `${pipestatus[1]}` (zsh) / `${PIPESTATUS[0]}` (bash) for the real command's code.
+- **Unique id per run** — so a stale channel or file can't cross-talk between runs.
+
+If `tmux wait-for` is ever unavailable, fall back to polling `capture-pane` for a
+sentinel line containing a digit (e.g. `__DONE_[0-9]`) — matching a digit so the
+echoed command line doesn't false-trigger the poll.
+
 ## Debugging patterns
 
 | User says | What to do |
@@ -167,6 +228,7 @@ tmux split-window -v -t <target> -c "$(tmux display-message -t <target> -p '#{pa
 | "run X in the server pane" | Find the right pane → send keys |
 | "open a pane for X" | Determine best session/window → split or new window → run command |
 | "run tests in a new pane" | Split next to the relevant server pane → run test command |
+| "run X and wait" / "run X so I can watch it" | Run-and-wait with a completion sentinel (Step 9) → read exit code + output |
 | "set up the dev environment" | Create session/windows/panes as needed → start servers |
 
 ## Now: auto-inspect

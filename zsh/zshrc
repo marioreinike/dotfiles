@@ -172,6 +172,19 @@ hash -d w=~/WORKSPACES
 # Quick navigate to git worktree by branch name
 cdwt() { cd "$(git worktree list | grep "$1" | awk '{print $1}')" }
 
+# Run a command in a visible tmux pane; block until it finishes; return its exit code.
+# Output streams live in the pane (via tee) AND is captured whole. Event-driven via
+# `tmux wait-for` — no polling. Usage: tmux-run <session:window.pane> <command...>
+tmux-run() {
+  local target=$1; shift
+  local id=$$-$RANDOM
+  local out="/tmp/tmuxrun.$id.log" rc="/tmp/tmuxrun.$id.rc"
+  tmux send-keys -t "$target" "( $* ) 2>&1 | tee $out ; echo \${pipestatus[1]} > $rc ; tmux wait-for -S tr-$id" Enter
+  tmux wait-for tr-$id
+  local code=$(cat "$rc")
+  cat "$out"; rm -f "$out" "$rc"; return "$code"
+}
+
 # Per-workspace repo freeness snapshot (branch/base/ahead/behind/tree)
 alias repostatus="$HOME/.claude/skills/repo-status/scripts/repo-status.sh"
 
