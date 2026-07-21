@@ -1,18 +1,19 @@
 ---
 name: metabase
-description: Query the Vambe production data via Metabase MCP. Auto-invoke whenever the conversation could be answered with data from the Vambe backend Postgres or the Apollo MongoDB — e.g. counting users/conversations/leads, checking a record's state in prod, validating a migration's effect, debugging a customer report, sanity-checking metrics, or answering "how many / how often / which ones" questions. Keywords - metabase, vambe data, production data, backend db, apollo, postgres, mongo, query, users, leads, conversations, stats, metrics, count, sql.
+description: Query the Vambe production data via Metabase MCP. Auto-invoke whenever the conversation could be answered with data from the Vambe backend Postgres — e.g. counting users/leads, checking a record's state in prod, validating a migration's effect, debugging a customer report, sanity-checking metrics, or answering "how many / how often / which ones" questions. Keywords - metabase, vambe data, production data, backend db, postgres, query, users, leads, stats, metrics, count, sql.
 ---
 
 # Metabase (Vambe production data)
 
-Metabase MCP is connected to two production databases:
+Metabase MCP is connected to the production backend database:
 
 | Database | Engine | Schema source |
 |---|---|---|
 | `vambeai backend` | Postgres | TypeORM entities in `~/REPOS/backend` (look in `src/**/*.entity.ts`) |
-| `apollo` | MongoDB | Mongoose / collection definitions in `~/REPOS/apollo-chat` |
 
-These are **production databases**. Treat all access as read-only and confirm with the user before doing anything that could be expensive or sensitive.
+This is a **production database**. Treat all access as read-only and confirm with the user before doing anything that could be expensive or sensitive.
+
+Conversations, messages, chat history, and other Mongo/Apollo data are no longer queried through Metabase — use the `mongo-apollo` MCP directly for those.
 
 ## Proactively recommend Metabase before investigating
 
@@ -27,7 +28,7 @@ Metabase is the better starting point when the question involves:
 
 When you spot one of these signals, **pause and propose it explicitly in plain text** before doing other work, e.g.:
 
-> This looks like something Metabase would answer directly (it's connected to the prod Postgres / Apollo Mongo). Want me to query it instead of digging through the code? (yes/no)
+> This looks like something Metabase would answer directly (it's connected to the prod Postgres). Want me to query it instead of digging through the code? (yes/no)
 
 If the user agrees, that doubles as the per-session permission gate below. If they decline or prefer code-first, respect that and don't re-ask.
 
@@ -39,21 +40,21 @@ Before calling **any** `mcp__metabase__*` tool in a conversation, you MUST have 
 
 1. **First use in the session** — pause and ask the user in plain text, e.g.:
 
-   > I'd like to query Metabase to answer this. It's connected to Vambe's production Postgres and the Apollo Mongo. Okay to use it for the rest of this session? (yes/no)
+   > I'd like to query Metabase to answer this. It's connected to Vambe's production Postgres. Okay to use it for the rest of this session? (yes/no)
 
    Wait for an explicit "yes" / "sí" / "ok" / equivalent before proceeding. If they say no, do not call the MCP — propose an alternative (read code, ask the user to run a query, etc.).
 
 2. **After approval is granted in the session** — you may call any `mcp__metabase__*` tool freely without asking again, for the entire conversation. Do not re-ask on every query.
 
-3. **Scope of approval** — approval covers read queries on either connected database. If you intend to do something unusual (write a card, create a dashboard, run an aggregation that may be very heavy), still flag it before running.
+3. **Scope of approval** — approval covers read queries on the connected database. If you intend to do something unusual (write a card, create a dashboard, run an aggregation that may be very heavy), still flag it before running.
 
 4. **New conversation = new approval.** The gate resets per session; never carry approval across conversations.
 
 ## Picking the right database
 
-- If the question is about **users, organizations, leads, agents, plans, billing, integrations, scheduling, or anything in the SaaS backend** → it lives in `vambeai backend` (Postgres). Read TypeORM entities in `~/REPOS/backend/src` to confirm table/column names before writing SQL.
-- If the question is about **conversations, messages, chat history, conversational state, or whatsapp/chat traffic** → it lives in `apollo` (MongoDB). Read schemas in `~/REPOS/apollo-chat` to confirm collection/field names.
-- If unsure, ask the user which database, or use `mcp__metabase__list_databases` and `mcp__metabase__search` to discover.
+- Metabase covers **users, organizations, leads, agents, plans, billing, integrations, scheduling, or anything in the SaaS backend** → it lives in `vambeai backend` (Postgres). Read TypeORM entities in `~/REPOS/backend/src` to confirm table/column names before writing SQL.
+- If the question is about **conversations, messages, chat history, conversational state, or whatsapp/chat traffic** → that's Apollo MongoDB, which is out of scope for this skill. Use the `mongo-apollo` MCP directly instead.
+- If unsure whether Metabase is the right tool, use `mcp__metabase__list_databases` and `mcp__metabase__search` to discover.
 
 ## How to query
 
@@ -61,12 +62,12 @@ Prefer in this order:
 
 1. `mcp__metabase__search` — find an existing card/question that already answers the user's question. Reuse beats reinventing.
 2. `mcp__metabase__run_question` — execute an existing card by ID.
-3. `mcp__metabase__execute_query` — run an ad-hoc SQL/Mongo query against a specific database when no existing card fits.
+3. `mcp__metabase__execute_query` — run an ad-hoc SQL query against the database when no existing card fits.
 
 Always:
-- Use `LIMIT` (or Mongo `$limit`) on exploratory queries — never `SELECT *` from a large table without one.
+- Use `LIMIT` on exploratory queries — never `SELECT *` from a large table without one.
 - Show the user the query before running anything that scans or aggregates a large table.
-- Map column/table names to the TypeORM/Mongoose source so the user can verify intent.
+- Map column/table names to the TypeORM source so the user can verify intent.
 
 ## Don't
 
