@@ -22,15 +22,24 @@
 # CPU work. Worktrees of the same repo share one object database but each has its
 # own index/HEAD, so concurrent read-only git calls across them are safe.
 #
+# With --fetch/-f, `git fetch origin` runs first against every DISTINCT repo
+# discovered across the scanned worktrees (deduped by shared git-common-dir, so a
+# repo checked out in 5 workspaces is only fetched once) — also parallelized and
+# capped at DISPATCH_WS_SCAN_PARALLEL. Repo discovery comes from the worktrees
+# actually present under WS_ROOT, not from repos.conf or a full ~/REPOS scan, so
+# it never fetches repos you aren't actively dispatching work in.
+#
 # Usage:
-#   ws-scan.sh             human-readable report of all workspaces
-#   ws-scan.sh --report    same as above
-#   ws-scan.sh --free      print only the names of FREE workspaces (one per line)
+#   ws-scan.sh               human-readable report of all workspaces
+#   ws-scan.sh --report      same as above
+#   ws-scan.sh --free        print only the names of FREE workspaces (one per line)
+#   ws-scan.sh -f|--fetch    fetch origin for every distinct repo first (combine
+#                            with --free/--report in any order)
 #
 # Env overrides:
 #   DISPATCH_CONF               path to repos.conf  (default: ../repos.conf)
 #   DISPATCH_WORKSPACES         workspaces root     (default: ~/WORKSPACES)
-#   DISPATCH_WS_SCAN_PARALLEL   max concurrent per-worktree scans (default: nproc)
+#   DISPATCH_WS_SCAN_PARALLEL   max concurrent per-worktree scans/fetches (default: nproc)
 
 set -uo pipefail
 
@@ -39,12 +48,17 @@ CONF="${DISPATCH_CONF:-$SCRIPT_DIR/../repos.conf}"
 WS_ROOT="${DISPATCH_WORKSPACES:-$HOME/WORKSPACES}"
 
 MODE="report"
-case "${1:-}" in
-  --free)             MODE="free" ;;
-  --report|"")        MODE="report" ;;
-  -h|--help)          sed -n '2,33p' "$0"; exit 0 ;;
-  *) echo "usage: ws-scan.sh [--free|--report]" >&2; exit 2 ;;
-esac
+FETCH=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --free)             MODE="free" ;;
+    --report)           MODE="report" ;;
+    -f|--fetch)         FETCH=1 ;;
+    -h|--help)          sed -n '2,42p' "$0"; exit 0 ;;
+    *) echo "usage: ws-scan.sh [--free|--report] [-f|--fetch]" >&2; exit 2 ;;
+  esac
+  shift
+done
 
 default_parallel() {
   if command -v nproc >/dev/null 2>&1; then nproc
@@ -106,6 +120,36 @@ for ws in "$WS_ROOT"/*/; do
   done
   WS_HAS_WT+=("$has_wt")
 done
+
+if [ "$FETCH" = "1" ]; then
+  # Dedupe repo roots (a repo checked out in N workspaces is fetched once).
+  declare -a UNIQUE_ROOTS
+  if [ "$total" -gt 0 ]; then
+    while IFS= read -r root; do
+      [ -n "$root" ] && UNIQUE_ROOTS+=("$root")
+    done < <(printf '%s\n' "${WT_ROOT[@]}" | sort -u)
+  fi
+
+  if [ "${#UNIQUE_ROOTS[@]}" -gt 0 ]; then
+    echo "Fetching ${#UNIQUE_ROOTS[@]} distinct repo(s)..." >&2
+    fetch_repo() {
+      local root="$1" out
+      if ! out=$(git -C "$root" fetch --quiet origin 2>&1); then
+        echo "warning: fetch failed for $(basename "$root"): $out" >&2
+      fi
+    }
+    fetch_pids=()
+    for root in "${UNIQUE_ROOTS[@]}"; do
+      fetch_repo "$root" &
+      fetch_pids+=("$!")
+      if [ "${#fetch_pids[@]}" -ge "$MAX_PARALLEL" ]; then
+        wait "${fetch_pids[0]}"
+        fetch_pids=("${fetch_pids[@]:1}")
+      fi
+    done
+    wait
+  fi
+fi
 
 # Pass 2 (expensive, parallel): per-worktree git checks, each writing its
 # result to an indexed temp file so reassembly order is deterministic.

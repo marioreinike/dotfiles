@@ -11,11 +11,17 @@
 # offline-comparison caveat are identical to ws-scan.sh — see its --help.
 #
 # Usage:
-#   repo-status.sh          grouped-by-workspace table (default)
+#   repo-status.sh             grouped-by-workspace table (default)
+#   repo-status.sh -f|--fetch  fetch origin for every distinct repo first (forwarded
+#                              to ws-scan.sh — see its --help for what "distinct" means)
+#
+# The table format always comes from ws-scan.sh's --report mode (this script's awk
+# depends on that exact format), so only -f/--fetch is accepted here — not --free.
 #
 # Env overrides (passed through to ws-scan.sh):
-#   DISPATCH_CONF        path to repos.conf
-#   DISPATCH_WORKSPACES  workspaces root
+#   DISPATCH_CONF               path to repos.conf
+#   DISPATCH_WORKSPACES         workspaces root
+#   DISPATCH_WS_SCAN_PARALLEL   max concurrent per-worktree scans/fetches
 
 set -uo pipefail
 
@@ -25,7 +31,16 @@ if [ ! -x "$DISPATCH_SCAN" ]; then
   exit 1
 fi
 
-raw="$("$DISPATCH_SCAN" --report)"
+scan_args=(--report)
+for arg in "$@"; do
+  case "$arg" in
+    -f|--fetch) scan_args+=(--fetch) ;;
+    -h|--help)  sed -n '2,23p' "$0"; exit 0 ;;
+    *) echo "usage: repo-status.sh [-f|--fetch]" >&2; exit 2 ;;
+  esac
+done
+
+raw="$("$DISPATCH_SCAN" "${scan_args[@]}")"
 
 echo "$raw" | awk '
   function trunc(s, n,   r) {

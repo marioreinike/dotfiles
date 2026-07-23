@@ -59,11 +59,12 @@ A workspace qualifies for a new dispatch only when `ws-scan.sh`'s overall verdic
 For "status of my workspaces", "which workspaces are free", "anything unmerged", etc.
 
 ```bash
-"${CLAUDE_SKILL_DIR}/scripts/ws-scan.sh"            # full report
-"${CLAUDE_SKILL_DIR}/scripts/ws-scan.sh" --free     # just FREE workspace names
+"${CLAUDE_SKILL_DIR}/scripts/ws-scan.sh"                # full report (offline)
+"${CLAUDE_SKILL_DIR}/scripts/ws-scan.sh" --free         # just FREE workspace names
+"${CLAUDE_SKILL_DIR}/scripts/ws-scan.sh" --fetch        # fetch origin first (every distinct repo, deduped + parallelized), then full report
 ```
 
-Present a tidy summary: list **FREE** workspaces first, then **OCCUPIED** ones and *why* (which worktree is dirty, or on an unmerged branch — show branch + ahead/behind). Scan is offline; if the user needs the absolute latest, mention they can `git fetch` the repos first.
+Present a tidy summary: list **FREE** workspaces first, then **OCCUPIED** ones and *why* (which worktree is dirty, or on an unmerged branch — show branch + ahead/behind). Scan is offline by default; if the user needs the absolute latest, add `--fetch` (or `-f`) instead of manually fetching each repo.
 
 For a **fuller per-repo detail view** instead (branch/base/ahead/behind/tree columns per repo, grouped by workspace), use the separate `repo-status` skill — it wraps this same `ws-scan.sh`, so it's always in sync.
 
