@@ -9,9 +9,12 @@
 #   ignored. A workspace is FREE only when every worktree in it is FREE.
 #   A workspace with no worktrees is FREE (empty).
 #
-# Comparison is OFFLINE (no fetch) — it uses the local base branch ref, falling
-# back to origin/<base>, then origin/HEAD. Run a fetch first if you need the
-# absolute latest base.
+# Comparison is OFFLINE (no fetch) — it uses origin/<base>, falling back to the
+# local base branch ref, then origin/HEAD. origin/<base> is preferred because it
+# gets refreshed by any `git fetch` in that repo, whereas a local base branch only
+# updates if someone explicitly checks it out and pulls it — a stale local base
+# branch otherwise reports false "commits ahead". Run a fetch first if you need
+# the absolute latest base.
 #
 # Usage:
 #   ws-scan.sh             human-readable report of all workspaces
@@ -42,13 +45,13 @@ base_for_repo() {
 }
 
 resolve_base_ref() {
-  # echoes a ref usable for rev-list: local branch, else origin/<base>, else origin/HEAD
+  # echoes a ref usable for rev-list: origin/<base>, else local branch, else origin/HEAD
   local repo_dir="$1" base="$2" def
-  if [ -n "$base" ] && git -C "$repo_dir" show-ref --verify --quiet "refs/heads/$base"; then
-    echo "$base"; return
-  fi
   if [ -n "$base" ] && git -C "$repo_dir" show-ref --verify --quiet "refs/remotes/origin/$base"; then
     echo "origin/$base"; return
+  fi
+  if [ -n "$base" ] && git -C "$repo_dir" show-ref --verify --quiet "refs/heads/$base"; then
+    echo "$base"; return
   fi
   def=$(git -C "$repo_dir" symbolic-ref -q refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
   [ -n "$def" ] && echo "origin/$def" || echo ""
