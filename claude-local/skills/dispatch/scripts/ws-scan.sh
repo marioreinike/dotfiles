@@ -16,14 +16,21 @@
 # branch otherwise reports false "commits ahead". Run a fetch first if you need
 # the absolute latest base.
 #
+# Per-worktree git checks (all read-only: rev-parse/status/show-ref/rev-list) run
+# in parallel, capped at DISPATCH_WS_SCAN_PARALLEL concurrent jobs, since they're
+# independent of each other and dominated by process-spawn overhead rather than
+# CPU work. Worktrees of the same repo share one object database but each has its
+# own index/HEAD, so concurrent read-only git calls across them are safe.
+#
 # Usage:
 #   ws-scan.sh             human-readable report of all workspaces
 #   ws-scan.sh --report    same as above
 #   ws-scan.sh --free      print only the names of FREE workspaces (one per line)
 #
 # Env overrides:
-#   DISPATCH_CONF        path to repos.conf  (default: ../repos.conf)
-#   DISPATCH_WORKSPACES  workspaces root     (default: ~/WORKSPACES)
+#   DISPATCH_CONF               path to repos.conf  (default: ../repos.conf)
+#   DISPATCH_WORKSPACES         workspaces root     (default: ~/WORKSPACES)
+#   DISPATCH_WS_SCAN_PARALLEL   max concurrent per-worktree scans (default: nproc)
 
 set -uo pipefail
 
@@ -35,9 +42,17 @@ MODE="report"
 case "${1:-}" in
   --free)             MODE="free" ;;
   --report|"")        MODE="report" ;;
-  -h|--help)          sed -n '2,30p' "$0"; exit 0 ;;
+  -h|--help)          sed -n '2,33p' "$0"; exit 0 ;;
   *) echo "usage: ws-scan.sh [--free|--report]" >&2; exit 2 ;;
 esac
+
+default_parallel() {
+  if command -v nproc >/dev/null 2>&1; then nproc
+  elif command -v sysctl >/dev/null 2>&1; then sysctl -n hw.ncpu
+  else echo 4
+  fi
+}
+MAX_PARALLEL="${DISPATCH_WS_SCAN_PARALLEL:-$(default_parallel)}"
 
 base_for_repo() {
   [ -f "$CONF" ] || return 0
@@ -57,15 +72,20 @@ resolve_base_ref() {
   [ -n "$def" ] && echo "origin/$def" || echo ""
 }
 
-free_list=""
-report=""
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/ws-scan.XXXXXX")
+trap 'rm -rf "$tmpdir"' EXIT
+
+# Pass 1 (cheap, sequential): walk workspaces/worktrees and record which dirs
+# are real worktrees, in the exact grouped order the report needs.
+declare -a WS_ORDER WS_HAS_WT
+declare -a WT_WS WT_DIR WT_ALIAS WT_REPO WT_ROOT
+total=0
 
 for ws in "$WS_ROOT"/*/; do
   [ -d "$ws" ] || continue
   wsname=$(basename "$ws")
-  ws_free=1
+  WS_ORDER+=("$wsname")
   has_wt=0
-  lines=""
 
   for d in "$ws"*/; do
     [ -e "$d/.git" ] || continue
@@ -74,28 +94,77 @@ for ws in "$WS_ROOT"/*/; do
     case "$common" in /*) ;; *) common="$d/$common" ;; esac
     repo_root=$(cd "$(dirname "$common")" 2>/dev/null && pwd) || continue
     reponame=$(basename "$repo_root")
-    alias=$(basename "$d")
+    walias=$(basename "$d")
     has_wt=1
 
-    branch=$(git -C "$d" rev-parse --abbrev-ref HEAD 2>/dev/null)
-    base=$(base_for_repo "$reponame")
-    baseref=$(resolve_base_ref "$repo_root" "$base")
-    dirty=$(git -C "$d" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+    WT_WS[$total]="$wsname"
+    WT_DIR[$total]="$d"
+    WT_ALIAS[$total]="$walias"
+    WT_REPO[$total]="$reponame"
+    WT_ROOT[$total]="$repo_root"
+    total=$((total + 1))
+  done
+  WS_HAS_WT+=("$has_wt")
+done
 
-    ahead="?"; behind="?"
-    if [ -n "$baseref" ]; then
-      ahead=$(git -C "$d" rev-list --count "$baseref..HEAD" 2>/dev/null || echo "?")
-      behind=$(git -C "$d" rev-list --count "HEAD..$baseref" 2>/dev/null || echo "?")
-    fi
+# Pass 2 (expensive, parallel): per-worktree git checks, each writing its
+# result to an indexed temp file so reassembly order is deterministic.
+scan_worktree() {
+  local i="$1" d="$2" walias="$3" reponame="$4" repo_root="$5"
+  local branch base baseref dirty ahead behind wt_free state
 
-    wt_free=1
-    [ "$dirty" != "0" ] && wt_free=0
-    [ "$ahead" != "0" ] && wt_free=0   # "?" (unknown base) also counts as busy, to be safe
+  branch=$(git -C "$d" rev-parse --abbrev-ref HEAD 2>/dev/null)
+  base=$(base_for_repo "$reponame")
+  baseref=$(resolve_base_ref "$repo_root" "$base")
+  dirty=$(git -C "$d" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+
+  ahead="?"; behind="?"
+  if [ -n "$baseref" ]; then
+    ahead=$(git -C "$d" rev-list --count "$baseref..HEAD" 2>/dev/null || echo "?")
+    behind=$(git -C "$d" rev-list --count "HEAD..$baseref" 2>/dev/null || echo "?")
+  fi
+
+  wt_free=1
+  [ "$dirty" != "0" ] && wt_free=0
+  [ "$ahead" != "0" ] && wt_free=0   # "?" (unknown base) also counts as busy, to be safe
+
+  state="free"; [ "$wt_free" = "0" ] && state="BUSY"
+  {
+    echo "$wt_free"
+    echo "    [$state] ${walias} (repo=${reponame}) branch=${branch} base=${base:-${baseref:-?}} dirty=${dirty} ahead=${ahead} behind=${behind}"
+  } > "$tmpdir/$i.out"
+}
+
+running_pids=()
+for ((i = 0; i < total; i++)); do
+  scan_worktree "$i" "${WT_DIR[$i]}" "${WT_ALIAS[$i]}" "${WT_REPO[$i]}" "${WT_ROOT[$i]}" &
+  running_pids+=("$!")
+  if [ "${#running_pids[@]}" -ge "$MAX_PARALLEL" ]; then
+    wait "${running_pids[0]}"
+    running_pids=("${running_pids[@]:1}")
+  fi
+done
+wait
+
+# Reassemble: walk workspaces in original order, consuming worktree results in
+# the same grouped order they were recorded in (WT_WS is grouped by construction).
+free_list=""
+report=""
+idx=0
+
+for wi in "${!WS_ORDER[@]}"; do
+  wsname="${WS_ORDER[$wi]}"
+  has_wt="${WS_HAS_WT[$wi]}"
+  ws_free=1
+  lines=""
+
+  while [ "$idx" -lt "$total" ] && [ "${WT_WS[$idx]}" = "$wsname" ]; do
+    wt_free=$(sed -n '1p' "$tmpdir/$idx.out")
+    line=$(sed -n '2p' "$tmpdir/$idx.out")
     [ "$wt_free" = "0" ] && ws_free=0
-
-    state="free"; [ "$wt_free" = "0" ] && state="BUSY"
     lines="${lines}
-    [$state] ${alias} (repo=${reponame}) branch=${branch} base=${base:-${baseref:-?}} dirty=${dirty} ahead=${ahead} behind=${behind}"
+${line}"
+    idx=$((idx + 1))
   done
 
   verdict="FREE"; [ "$ws_free" = "0" ] && verdict="OCCUPIED"
