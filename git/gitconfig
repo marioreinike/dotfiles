@@ -8,6 +8,7 @@
 	cf = commit --fixup
 	ca = commit --amend
 	l = log --oneline
+	ff = merge --ff-only
 	cane = commit --amend --no-edit
 	lg = log --graph --oneline --decorate --all
 	rba = rebase --autosquash
