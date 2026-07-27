@@ -12,11 +12,16 @@
 #
 # Usage:
 #   repo-status.sh             grouped-by-workspace table (default)
-#   repo-status.sh -f|--fetch  fetch origin for every distinct repo first (forwarded
-#                              to ws-scan.sh — see its --help for what "distinct" means)
+#   repo-status.sh [ws-scan flags…]
 #
-# The table format always comes from ws-scan.sh's --report mode (this script's awk
-# depends on that exact format), so only -f/--fetch is accepted here — not --free.
+# All flags are forwarded to ws-scan.sh verbatim — nothing is re-declared here, so
+# any flag ws-scan.sh gains (and its own validation of unknown flags) works through
+# this wrapper automatically. E.g. -f|--fetch fetches origin for every distinct repo
+# first; see ws-scan.sh --help for the full list.
+#
+# Two exceptions, both because this script's awk depends on ws-scan.sh's --report
+# output format: --report is always appended last (so it wins over anything you
+# pass), and --free is rejected outright — use ws-scan.sh --free directly for that.
 #
 # Env overrides (passed through to ws-scan.sh):
 #   DISPATCH_CONF               path to repos.conf
@@ -31,16 +36,20 @@ if [ ! -x "$DISPATCH_SCAN" ]; then
   exit 1
 fi
 
-scan_args=(--report)
+scan_args=()
 for arg in "$@"; do
   case "$arg" in
-    -f|--fetch) scan_args+=(--fetch) ;;
-    -h|--help)  sed -n '2,23p' "$0"; exit 0 ;;
-    *) echo "usage: repo-status.sh [-f|--fetch]" >&2; exit 2 ;;
+    -h|--help) sed -n '2,29p' "$0"; exit 0 ;;
+    --free)
+      echo "error: --free is incompatible with repo-status.sh (it needs ws-scan.sh's --report format)" >&2
+      echo "       run: $DISPATCH_SCAN --free" >&2
+      exit 2 ;;
+    *) scan_args+=("$arg") ;;   # forwarded untouched; ws-scan.sh validates it
   esac
 done
+scan_args+=(--report)
 
-raw="$("$DISPATCH_SCAN" "${scan_args[@]}")"
+raw="$("$DISPATCH_SCAN" "${scan_args[@]}")" || exit $?
 
 echo "$raw" | awk '
   function trunc(s, n,   r) {

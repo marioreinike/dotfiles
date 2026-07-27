@@ -18,6 +18,8 @@ It wraps dispatch's `ws-scan.sh` (same `repos.conf` / workspaces root, same free
 "${CLAUDE_SKILL_DIR}/scripts/repo-status.sh" --fetch   # fetch origin first, then report
 ```
 
+Flags are forwarded to `ws-scan.sh` verbatim (it does the validation), so anything it accepts works here. The only exception is `--free`, which is rejected — this script's table needs `ws-scan.sh`'s `--report` output, which is always forced on.
+
 Output: one table per workspace, columns `repo | status (FREE/BUSY) | branch | base | ahead | behind | tree (clean / N change(s))`, rows sorted by repo alias. A workspace's table only lists the repo aliases it actually has a worktree for — not every workspace has every repo.
 
 Just run it and print the output verbatim (it's already formatted plain text) — no need to re-summarize into prose unless the user asks a follow-up question about it.
