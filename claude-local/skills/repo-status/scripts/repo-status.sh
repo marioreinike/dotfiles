@@ -10,23 +10,8 @@
 # straight from ws-scan.sh's own verdict). Freeness rule and
 # offline-comparison caveat are identical to ws-scan.sh — see its --help.
 #
-# Usage:
-#   repo-status.sh             grouped-by-workspace table (default)
-#   repo-status.sh [ws-scan flags…]
-#
-# All flags are forwarded to ws-scan.sh verbatim — nothing is re-declared here, so
-# any flag ws-scan.sh gains (and its own validation of unknown flags) works through
-# this wrapper automatically. E.g. -f|--fetch fetches origin for every distinct repo
-# first; see ws-scan.sh --help for the full list.
-#
-# Two exceptions, both because this script's awk depends on ws-scan.sh's --report
-# output format: --report is always appended last (so it wins over anything you
-# pass), and --free is rejected outright — use ws-scan.sh --free directly for that.
-#
-# Env overrides (passed through to ws-scan.sh):
-#   DISPATCH_CONF               path to repos.conf
-#   DISPATCH_WORKSPACES         workspaces root
-#   DISPATCH_WS_SCAN_PARALLEL   max concurrent per-worktree scans/fetches
+# Run -h/--help for flags. All args are forwarded to ws-scan.sh untouched, except
+# --report (always forced, the awk below needs that format) and --free (rejected).
 
 set -uo pipefail
 
@@ -36,10 +21,29 @@ if [ ! -x "$DISPATCH_SCAN" ]; then
   exit 1
 fi
 
+usage() {
+  cat <<EOF
+repo-status.sh — per-workspace freeness snapshot: one table per workspace, one row
+per repo in it (branch, base, ahead, behind, tree). Wraps dispatch's ws-scan.sh.
+
+Usage: repo-status.sh [flags]
+
+Flags:
+  -f, --fetch   fetch origin for every distinct repo before scanning
+  -h, --help    show this help
+
+Any other flag is forwarded to ws-scan.sh, which validates it. Exceptions:
+--report is always forced (the table needs it) and --free is not supported here
+(run ws-scan.sh --free instead).
+
+Env: DISPATCH_CONF, DISPATCH_WORKSPACES, DISPATCH_WS_SCAN_PARALLEL — see ws-scan.sh
+EOF
+}
+
 scan_args=()
 for arg in "$@"; do
   case "$arg" in
-    -h|--help) sed -n '2,29p' "$0"; exit 0 ;;
+    -h|--help) usage; exit 0 ;;
     --free)
       echo "error: --free is incompatible with repo-status.sh (it needs ws-scan.sh's --report format)" >&2
       echo "       run: $DISPATCH_SCAN --free" >&2
