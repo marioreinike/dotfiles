@@ -89,8 +89,16 @@ echo "$raw" | awk -v sessions="$sessions" '
   function dirtylabel(d) {
     return (d == "0") ? "clean" : d " change(s)"
   }
+  # Display width. awk here counts BYTES, and the "…" trunc() inserts is 3 bytes
+  # but renders as one column — so discount 2 per occurrence, or every truncated
+  # cell ends up 2 columns short and the table loses alignment.
+  function dlen(s,   t, n) {
+    t = s
+    n = gsub(/…/, "", t)
+    return length(s) - 2 * n
+  }
   function pad(s, n) {
-    while (length(s) < n) s = s " "
+    while (dlen(s) < n) s = s " "
     return s
   }
   function colorstatus(s, n,   padded) {
@@ -157,7 +165,7 @@ echo "$raw" | awk -v sessions="$sessions" '
         avail = HDRWIDTH - length(prefix) - length(verdict) - 3   # 2 lead spaces + 1 min gap
         if (avail >= 12) sesspart = "  tmux: " trunc(mysess, avail - 8)
       }
-      gap = HDRWIDTH - length(prefix) - length(sesspart) - length(verdict)
+      gap = HDRWIDTH - length(prefix) - dlen(sesspart) - length(verdict)
       if (gap < 1) gap = 1
       spacer = ""
       for (k = 0; k < gap; k++) spacer = spacer " "
