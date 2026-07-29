@@ -16,8 +16,9 @@
 # as maybe-in-use rather than grabbing it. Dispatch names sessions
 # "<ws>-<feature>", so a session belongs to a workspace when its name equals the
 # workspace or is prefixed with "<ws>-". Precedence is BUSY > CLAIMED > FREE
-# (unmerged work stays red), and any workspace with live sessions lists them
-# under its header regardless of verdict.
+# (unmerged work stays red), and any workspace with live sessions names them in
+# its header row — between the workspace name and the verdict, truncated to the
+# space left there — regardless of verdict.
 #
 # Run -h/--help for flags. All args are forwarded to ws-scan.sh untouched, except
 # --report (always forced, the awk below needs that format) and --free (rejected).
@@ -149,12 +150,18 @@ echo "$raw" | awk -v sessions="$sessions" '
       mysess = ws_sessions(wsname)
       # git-free but a session is still open in it: maybe in use, not free.
       if (verdict == "FREE" && mysess != "") verdict = "CLAIMED"
-      gap = HDRWIDTH - length(prefix) - length(verdict)
+      # Session list shares the header row: "[wsN]  tmux: a, b        VERDICT",
+      # truncated to whatever space is left between the name and the verdict.
+      sesspart = ""
+      if (mysess != "") {
+        avail = HDRWIDTH - length(prefix) - length(verdict) - 3   # 2 lead spaces + 1 min gap
+        if (avail >= 12) sesspart = "  tmux: " trunc(mysess, avail - 8)
+      }
+      gap = HDRWIDTH - length(prefix) - length(sesspart) - length(verdict)
       if (gap < 1) gap = 1
       spacer = ""
       for (k = 0; k < gap; k++) spacer = spacer " "
-      printf "\n\033[48;5;238m%s%s\033[0m%s\n", prefix, spacer, colorstatus_right(verdict)
-      if (mysess != "") printf "\033[38;5;208mtmux: %s\033[0m\n", mysess
+      printf "\n\033[48;5;238m%s\033[38;5;208m%s\033[39m%s\033[0m%s\n", prefix, sesspart, spacer, colorstatus_right(verdict)
       hdr = sprintf("%s %s %s %s %s %s %s", pad("repo",12), pad("status",6), pad("branch",30), pad("base",12), pad("ahead",5), pad("behind",6), pad("tree",10))
       print hdr
       for (k = 0; k < length(hdr); k++) printf "-"

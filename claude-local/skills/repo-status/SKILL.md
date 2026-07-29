@@ -33,7 +33,7 @@ The workspace header carries a three-state verdict, precedence `BUSY > CLAIMED >
 | `CLAIMED` | orange | git-free, but a live tmux session is open in it — probably still in use, prefer another workspace |
 | `BUSY` | red | at least one repo is dirty or ahead of its base (unmerged work) |
 
-Any workspace with live sessions also lists them on an orange `tmux: …` line under its header, whatever the verdict — so you see the open sessions on `BUSY` workspaces too. Session-to-workspace matching follows dispatch's naming (`<ws>-<feature>`): a session belongs to `ws7` when it is named `ws7` or starts with `ws7-`. Per-repo rows stay `FREE`/`BUSY`, since a tmux session belongs to a workspace, not to a single repo.
+Any workspace with live sessions names them in the header row itself — orange `tmux: <sessions>` between the workspace name and the right-aligned verdict, truncated with `…` to the space left there — whatever the verdict, so you see open sessions on `BUSY` workspaces too. Session-to-workspace matching follows dispatch's naming (`<ws>-<feature>`): a session belongs to `ws7` when it is named `ws7` or starts with `ws7-`. Per-repo rows stay `FREE`/`BUSY`, since a tmux session belongs to a workspace, not to a single repo.
 
 Just run it and print the output verbatim (it's already formatted plain text) — no need to re-summarize into prose unless the user asks a follow-up question about it.
 
