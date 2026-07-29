@@ -169,6 +169,26 @@ export GEMINI_API_KEY=# REDACTED - set this manually (https://aistudio.google.co
 hash -d r=~/REPOS
 hash -d w=~/WORKSPACES
 
+# Jump into a dispatch workspace: `ws` lists them, `ws 5` → ~/WORKSPACES/ws5,
+# `ws 5 backend` → ~/WORKSPACES/ws5/backend. Tab-completes both arguments.
+ws() {
+  local base=$HOME/WORKSPACES
+  if (( $# == 0 )); then
+    print -l $base/ws*(/N:t)
+    return
+  fi
+  local target=$base/ws${1#ws}${2:+/$2}
+  [[ -d $target ]] || { print -u2 "ws: no such directory: $target"; return 1 }
+  cd $target
+}
+_ws() {
+  case $CURRENT in
+    2) compadd -- $HOME/WORKSPACES/ws*(/N:t:s/ws/) ;;
+    3) compadd -- $HOME/WORKSPACES/ws${words[2]#ws}/*(/N:t) ;;
+  esac
+}
+compdef _ws ws
+
 # Quick navigate to git worktree by branch name
 cdwt() { cd "$(git worktree list | grep "$1" | awk '{print $1}')" }
 
