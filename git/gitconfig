@@ -21,6 +21,7 @@
 [core]
 	editor = nano
 	pager = delta
+	hooksPath = /Users/mario/.config/git/hooks
 [push]
 	autoSetupRemote = true
 [pull]

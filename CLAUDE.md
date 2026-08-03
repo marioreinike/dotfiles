@@ -36,6 +36,7 @@ applock/          → Port-lease manager so competing agents don't collide runni
 |---|---|
 | `git/gitconfig` | `~/.gitconfig` |
 | `git/gitignore_global` | `~/.config/git/ignore` |
+| `git/hooks/pre-push` | `~/.config/git/hooks/pre-push` (global hooks dir, set via `core.hooksPath`) |
 | `lazygit/config.yml` | `~/.config/lazygit/config.yml` |
 | `zsh/zshrc` | `~/.zshrc` |
 | `zsh/p10k.zsh` | `~/.p10k.zsh` |

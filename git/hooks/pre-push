@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Warn before pushing if the last commit looks like a WIP commit.
+
+last_msg=$(git log -1 --pretty=%s 2>/dev/null)
+
+if echo "$last_msg" | grep -qiE '^(wip|fixup!|squash!)\b|\bwip\b'; then
+	# pre-push receives ref update data on stdin, so the confirmation
+	# prompt must go through the controlling terminal directly.
+	if [ ! -r /dev/tty ]; then
+		echo "Last commit looks like a WIP commit ('$last_msg') and no tty is available to confirm; aborting push." >&2
+		exit 1
+	fi
+	echo "Last commit looks like a WIP commit:" >&2
+	echo "  $last_msg" >&2
+	printf "Push anyway? [y/N] " >&2
+	read -r reply < /dev/tty
+	case "$reply" in
+		[yY]|[yY][eE][sS]) exit 0 ;;
+		*) echo "Push aborted." >&2; exit 1 ;;
+	esac
+fi
+
+exit 0
