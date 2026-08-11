@@ -11,6 +11,11 @@ These apply to every Claude Code session, across all projects.
 
 - NEVER run `git reset --hard` (or any other destructive/irreversible git command that discards uncommitted work) without my explicit, case-by-case permission. Always ask first and wait for my confirmation, even if it seems necessary to complete a task. There is no standing approval for this.
 
+## Background Agents
+
+- When launching background agents (Agent/Workflow tool calls), consider matching the model (Sonnet, Opus, or Fable) and reasoning effort to the task's complexity, rather than always defaulting to the inherited model.
+- If you choose a different model than the current session's default for a specific agent, state which model (and effort, if non-default) before launching it.
+
 ## Identifiers
 
 - ALWAYS print UUIDs, ObjectIDs, hashes, tokens, and other opaque IDs in full. Never truncate, abbreviate, ellipsize, or shorten them (no `abc123…`, no `abc12345...`, no first-8-chars-only). I need the complete value to copy-paste for debugging.
