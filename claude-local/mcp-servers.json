@@ -44,5 +44,12 @@
     "headers": {
       "Authorization": "# REDACTED - set this manually"
     }
+  },
+  "vambe-backoffice": {
+    "type": "http",
+    "url": "https://api.vambe.ai/frontend/api/public/backoffice-mcp",
+    "headers": {
+      "Authorization": "# REDACTED - set this manually"
+    }
   }
 }

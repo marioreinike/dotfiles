@@ -127,6 +127,7 @@ To restore on a new computer, use the `/pull` skill which merges `mcp-servers.js
 - `datadog-mcp`: headers `DD_API_KEY` and `DD_APPLICATION_KEY`
 - `metabase`: env `METABASE_API_KEY`
 - `vambe-product-os`: header `Authorization` (Bearer `vbpk_…` product key)
+- `vambe-backoffice`: header `Authorization` (Bearer `mcp_pt_…` personal token)
 
 The `playwright` entry is **platform-specific**. The backed-up values are macOS (`--browser chrome`, `--user-data-dir /Users/mario/.cache/playwright-mcp-profile`). On Linux the live config uses `--browser chromium` and `--user-data-dir /home/mario/.cache/playwright-mcp-profile` (Playwright's managed Chromium under `~/.cache/ms-playwright/`; no system Chrome installed there) — adjust after `/pull` on a Linux box. The profile is shared and persistent, so only one Claude session can drive the browser at a time — see the `/playwright` skill for the single-driver constraint and lock recovery.
 
