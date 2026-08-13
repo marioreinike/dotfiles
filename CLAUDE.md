@@ -76,7 +76,7 @@ applock/          → Port-lease manager so competing agents don't collide runni
 
 - **Never commit secrets** (API tokens, passwords, keys)
 - The `zsh/zshrc` file has `CLAUDE_API_TOKEN` and `NPM_TASKFORCESH_TOKEN` redacted with `# REDACTED - set this manually`
-- The `claude-local/mcp-servers.json` file has Datadog and Metabase API keys redacted with `# REDACTED - set this manually`
+- The `claude-local/mcp-servers.json` file has Datadog API keys redacted with `# REDACTED - set this manually`
 - If adding new env vars with secrets to zshrc or MCP configs, always redact them in the repo copy
 
 ## Oh My Zsh Details
@@ -125,7 +125,6 @@ Global MCP servers are configured in `~/.claude.json` (mcpServers key). The full
 
 To restore on a new computer, use the `/pull` skill which merges `mcp-servers.json` into `~/.claude.json`, then manually set the redacted secrets:
 - `datadog-mcp`: headers `DD_API_KEY` and `DD_APPLICATION_KEY`
-- `metabase`: env `METABASE_API_KEY`
 - `vambe-product-os`: header `Authorization` (Bearer `vbpk_…` product key)
 - `vambe-backoffice`: header `Authorization` (Bearer `mcp_pt_…` personal token)
 

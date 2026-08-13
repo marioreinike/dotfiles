@@ -26,18 +26,6 @@
       "DD_APPLICATION_KEY": "# REDACTED - set this manually"
     }
   },
-  "metabase": {
-    "type": "stdio",
-    "command": "npx",
-    "args": [
-      "-y",
-      "metabase-mcp"
-    ],
-    "env": {
-      "METABASE_URL": "https://metabase-production-2bb0.up.railway.app",
-      "METABASE_API_KEY": "# REDACTED - set this manually"
-    }
-  },
   "vambe-product-os": {
     "type": "http",
     "url": "https://product.vambe.org/api/mcp",
