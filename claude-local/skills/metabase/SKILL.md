@@ -5,13 +5,19 @@ description: Query the Vambe production data via Metabase MCP. Auto-invoke whene
 
 # Metabase (Vambe production data)
 
-Metabase MCP is connected to the production backend database:
+Metabase MCP (`@cognitionai/metabase-mcp-server`, stdio, username/password auth) is connected to the Vambe Metabase instance. The database that matters for this skill:
 
-| Database | Engine | Schema source |
-|---|---|---|
-| `vambeai backend` | Postgres | TypeORM entities in `~/REPOS/backend` (look in `src/**/*.entity.ts`) |
+| `database_id` | Database | Engine | Schema source |
+|---|---|---|---|
+| **2** | `Vambe ai prod` | Postgres | TypeORM entities in `~/REPOS/backend` (look in `src/**/*.entity.ts`) |
+
+Other databases visible in Metabase (`VambeCollections` id 3, `N8N` id 4, `MongoDB Apollo` id 5, ClickHouse ids 6/8, `mongo vambe logs` id 7) are out of scope here — for Mongo data use the `mongo-apollo` MCP directly.
 
 This is a **production database**. Treat all access as read-only and confirm with the user before doing anything that could be expensive or sensitive.
+
+## Known quirk: first call may 401
+
+The server (v1.0.14) has an auth-ordering bug: with username/password auth, the **first** `mcp__metabase__*` tool call in a session can fail with `Request failed with status code 401`. The session token is applied to all subsequent requests. If the first call 401s, **retry it once** — do not conclude the credentials are wrong or give up.
 
 Conversations, messages, chat history, and other Mongo/Apollo data are no longer queried through Metabase — use the `mongo-apollo` MCP directly for those.
 
@@ -54,15 +60,15 @@ Before calling **any** `mcp__metabase__*` tool in a conversation, you MUST have 
 
 - Metabase covers **users, organizations, leads, agents, plans, billing, integrations, scheduling, or anything in the SaaS backend** → it lives in `vambeai backend` (Postgres). Read TypeORM entities in `~/REPOS/backend/src` to confirm table/column names before writing SQL.
 - If the question is about **conversations, messages, chat history, conversational state, or whatsapp/chat traffic** → that's Apollo MongoDB, which is out of scope for this skill. Use the `mongo-apollo` MCP directly instead.
-- If unsure whether Metabase is the right tool, use `mcp__metabase__list_databases` and `mcp__metabase__search` to discover.
+- If unsure whether Metabase is the right tool, use `mcp__metabase__list_databases` and `mcp__metabase__search_content` to discover.
 
 ## How to query
 
 Prefer in this order:
 
-1. `mcp__metabase__search` — find an existing card/question that already answers the user's question. Reuse beats reinventing.
-2. `mcp__metabase__run_question` — execute an existing card by ID.
-3. `mcp__metabase__execute_query` — run an ad-hoc SQL query against the database when no existing card fits.
+1. `mcp__metabase__search_content` (param `q`) — find an existing card/question that already answers the user's question. Reuse beats reinventing.
+2. `mcp__metabase__execute_card` (param `card_id`) — execute an existing card by ID.
+3. `mcp__metabase__execute_query` (params `database_id`, `query`) — run an ad-hoc SQL query when no existing card fits. Use `database_id: 2` (`Vambe ai prod`) for backend questions.
 
 Always:
 - Use `LIMIT` on exploratory queries — never `SELECT *` from a large table without one.

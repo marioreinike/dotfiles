@@ -26,6 +26,19 @@
       "DD_APPLICATION_KEY": "# REDACTED - set this manually"
     }
   },
+  "metabase": {
+    "type": "stdio",
+    "command": "npx",
+    "args": [
+      "-y",
+      "@cognitionai/metabase-mcp-server"
+    ],
+    "env": {
+      "METABASE_URL": "https://metabase-production-2bb0.up.railway.app",
+      "METABASE_USERNAME": "mario.reinike@vambe.ai",
+      "METABASE_PASSWORD": "# REDACTED - set this manually"
+    }
+  },
   "vambe-product-os": {
     "type": "http",
     "url": "https://product.vambe.org/api/mcp",
