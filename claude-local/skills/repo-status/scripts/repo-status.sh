@@ -18,7 +18,9 @@
 # workspace or is prefixed with "<ws>-". Precedence is BUSY > CLAIMED > FREE
 # (unmerged work stays red), and any workspace with live sessions names them in
 # its header row — between the workspace name and the verdict, truncated to the
-# space left there — regardless of verdict.
+# space left there — regardless of verdict. A BUSY workspace with no live
+# session gets a bare dot after its badge, flagging unfinished work nobody
+# is actively working on right now.
 #
 # Run -h/--help for flags. All args are forwarded to ws-scan.sh untouched, except
 # --report (always forced, the awk below needs that format) and --free (rejected).
@@ -42,6 +44,8 @@ Workspace verdicts:
   FREE     every repo clean and fully merged, no tmux session open
   CLAIMED  git-free, but a live tmux session is open in it (maybe in use)
   BUSY     at least one repo dirty or ahead of its base
+           (a dot after BUSY marks a workspace with no live tmux session —
+           unfinished work that nobody is actively working on right now)
 
 Flags:
   -f, --fetch     fetch origin for every distinct repo before scanning
@@ -165,11 +169,15 @@ echo "$raw" | awk -v sessions="$sessions" '
         avail = HDRWIDTH - length(prefix) - length(verdict) - 3   # 2 lead spaces + 1 min gap
         if (avail >= 12) sesspart = "  tmux: " trunc(mysess, avail - 8)
       }
+      # A bare dot after the BUSY badge flags a busy workspace with no live
+      # tmux session in it — i.e. unfinished/unmerged work nobody is actively
+      # working on right now, as opposed to BUSY-with-a-session.
+      dot = (verdict == "BUSY" && mysess == "") ? " \033[91m\xe2\x97\x8f\033[0m" : ""
       gap = HDRWIDTH - length(prefix) - dlen(sesspart) - length(verdict)
       if (gap < 1) gap = 1
       spacer = ""
       for (k = 0; k < gap; k++) spacer = spacer " "
-      printf "\n\033[48;5;238m%s\033[38;5;208m%s\033[39m%s\033[0m%s\n", prefix, sesspart, spacer, colorstatus_right(verdict)
+      printf "\n\033[48;5;238m%s\033[38;5;208m%s\033[39m%s\033[0m%s%s\n", prefix, sesspart, spacer, colorstatus_right(verdict), dot
       hdr = sprintf("%s %s %s %s %s %s %s", pad("repo",12), pad("status",6), pad("branch",30), pad("base",12), pad("ahead",5), pad("behind",6), pad("tree",10))
       print hdr
       for (k = 0; k < length(hdr); k++) printf "-"
