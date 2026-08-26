@@ -25,6 +25,10 @@ Scope: applies only to the `backend` and `turborepo-frontend` repos, including a
 - Default workflow instead: commit the changes, rebase onto the target base branch, push, and open a PR — then let CI run these checks on GitHub and monitor the PR's check runs for me. Report back what passed/failed from there.
 - Only run one of these commands (including ones with a hidden build step) locally if I explicitly ask you to in the moment.
 
+## Config Drift
+
+- When you notice (via a system-reminder) that global `~/.claude/CLAUDE.md` or `~/.claude/settings.json` has changed, or before trusting a repo's `.claude/settings.local.json`, run `/sync-local-config` to check for drift against the dotfiles backup and for conflicts with repo-local settings.
+
 ## Identifiers
 
 - ALWAYS print UUIDs, ObjectIDs, hashes, tokens, and other opaque IDs in full. Never truncate, abbreviate, ellipsize, or shorten them (no `abc123…`, no `abc12345...`, no first-8-chars-only). I need the complete value to copy-paste for debugging.
