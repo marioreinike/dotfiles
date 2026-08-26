@@ -16,6 +16,15 @@ These apply to every Claude Code session, across all projects.
 - When launching background agents (Agent/Workflow tool calls), consider matching the model (Sonnet, Opus, or Fable) and reasoning effort to the task's complexity, rather than always defaulting to the inherited model.
 - If you choose a different model than the current session's default for a specific agent, state which model (and effort, if non-default) before launching it.
 
+## Local Resource Limits
+
+Scope: applies only to the `backend` and `turborepo-frontend` repos, including any of their git worktrees (e.g. checkouts under `~/WORKSPACES/*`). Not a general rule for every project.
+
+- In those repos, do NOT run typecheck, lint, build, or test commands on my local machine (`pnpm typecheck`, `tsc`, `pnpm build`, `pnpm test`, etc.) — my machine cannot handle the load and it crashes badly, which affects me a lot. This overrides any per-repo CLAUDE.md instruction that suggests running these locally.
+- This also covers commands that trigger a full build/compile *indirectly* as a side effect — e.g. the backend repo's `pnpm migration:generate` runs a `pretypeorm` hook that does a full `nest build` with an 8GB memory allocation. Before running any unfamiliar pnpm/npm script locally in these repos, check what it actually invokes (pre/post hooks included) for a build/compile step, and avoid it if so.
+- Default workflow instead: commit the changes, rebase onto the target base branch, push, and open a PR — then let CI run these checks on GitHub and monitor the PR's check runs for me. Report back what passed/failed from there.
+- Only run one of these commands (including ones with a hidden build step) locally if I explicitly ask you to in the moment.
+
 ## Identifiers
 
 - ALWAYS print UUIDs, ObjectIDs, hashes, tokens, and other opaque IDs in full. Never truncate, abbreviate, ellipsize, or shorten them (no `abc123…`, no `abc12345...`, no first-8-chars-only). I need the complete value to copy-paste for debugging.
