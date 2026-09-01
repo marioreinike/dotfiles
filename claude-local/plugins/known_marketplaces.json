@@ -5,6 +5,22 @@
       "repo": "anthropics/claude-plugins-official"
     },
     "installLocation": "/Users/mario/.claude/plugins/marketplaces/claude-plugins-official",
-    "lastUpdated": "2026-02-28T20:29:08.753Z"
+    "lastUpdated": "2026-09-01T13:40:20.104Z"
+  },
+  "vercel-vercel-plugin": {
+    "source": {
+      "source": "directory",
+      "path": "/Users/mario/.cache/plugins/github.com-vercel-vercel-plugin"
+    },
+    "installLocation": "/Users/mario/.cache/plugins/github.com-vercel-vercel-plugin",
+    "lastUpdated": "2026-03-30T03:11:11.297Z"
+  },
+  "caveman": {
+    "source": {
+      "source": "github",
+      "repo": "JuliusBrussee/caveman"
+    },
+    "installLocation": "/Users/mario/.claude/plugins/marketplaces/caveman",
+    "lastUpdated": "2026-09-01T13:39:42.546Z"
   }
 }
