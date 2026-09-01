@@ -110,7 +110,7 @@ So delta's appearance inside lazygit is controlled by the `[delta "lazygit"]` se
 
 **User-level skills** (backed up in `claude-local/skills/`, synced to `~/.claude/skills/`):
 - `/tmux` — Inspect tmux environment: list panes, read output, send commands, create panes/windows/sessions
-- `/metabase` — Query Vambe production data (backend Postgres + apollo Mongo) via Metabase MCP. Auto-invokes when a question could be answered with prod data; gates the MCP behind one-time per-session approval.
+- `/postgres-vambe-prod` — Query Vambe production data (backend Postgres, read replica) via direct postgres MCP. Auto-invokes when a question could be answered with prod data; gates the MCP behind one-time per-session approval.
 - `/dispatch` — Workspace dispatcher for git worktrees. Reports workspace status (free vs. unfinished/unmerged) and prepares new features: finds a free workspace, forks branches across the touched repos, and launches a Claude session in a fresh tmux session `wsN-<feature>`. Bundles `scripts/ws-scan.sh` + `repos.conf` (alias→repo→base map).
 - `/repo-status` — Per-workspace freeness snapshot across all dispatch workspaces: for each workspace, lists every repo alias in it with branch/base/ahead/behind/tree-cleanliness columns. Wraps dispatch's `ws-scan.sh`/`repos.conf` directly (`scripts/repo-status.sh`), so it stays in sync automatically.
 - `/applock` — Lease a `(service, port)` before running an app for local testing, so competing agents never bind the same port. Atomic flock acquire + heartbeat renewal + TTL reclaim; waits when the port is busy; auto-releases on exit. Backed by the `~/.local/bin/applock` CLI (tracked at `applock/applock`); ports dictionary at `~/.applock/services.json`.
@@ -125,9 +125,10 @@ Global MCP servers are configured in `~/.claude.json` (mcpServers key). The full
 
 To restore on a new computer, use the `/pull` skill which merges `mcp-servers.json` into `~/.claude.json`, then manually set the redacted secrets:
 - `datadog-mcp`: headers `DD_API_KEY` and `DD_APPLICATION_KEY`
-- `metabase`: env `METABASE_PASSWORD` (Metabase login password for `mario.reinike@vambe.ai`)
 - `vambe-product-os`: header `Authorization` (Bearer `vbpk_…` product key)
 - `vambe-backoffice`: header `Authorization` (Bearer `mcp_pt_…` personal token)
+- `postgres-vambe-dev`: env `PG_PASSWORD` (password for the `dev-db.vambe.ai` / `railway` Postgres instance)
+- `postgres-vambe-prod`: env `PG_PASSWORD` (password for the `vambeai-prod-read-replica-1` / `railway` Postgres read replica)
 
 The `playwright` entry is **platform-specific**. The backed-up values are macOS (`--browser chrome`, `--user-data-dir /Users/mario/.cache/playwright-mcp-profile`). On Linux the live config uses `--browser chromium` and `--user-data-dir /home/mario/.cache/playwright-mcp-profile` (Playwright's managed Chromium under `~/.cache/ms-playwright/`; no system Chrome installed there) — adjust after `/pull` on a Linux box. The profile is shared and persistent, so only one Claude session can drive the browser at a time — see the `/playwright` skill for the single-driver constraint and lock recovery.
 

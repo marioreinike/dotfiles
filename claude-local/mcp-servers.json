@@ -26,17 +26,34 @@
       "DD_APPLICATION_KEY": "# REDACTED - set this manually"
     }
   },
-  "metabase": {
+  "postgres-vambe-dev": {
     "type": "stdio",
     "command": "npx",
     "args": [
       "-y",
-      "@cognitionai/metabase-mcp-server"
+      "mcp-postgres-server"
     ],
     "env": {
-      "METABASE_URL": "https://metabase-production-2bb0.up.railway.app",
-      "METABASE_USERNAME": "mario.reinike@vambe.ai",
-      "METABASE_PASSWORD": "# REDACTED - set this manually"
+      "PG_HOST": "dev-db.vambe.ai",
+      "PG_PORT": "5432",
+      "PG_USER": "postgres",
+      "PG_PASSWORD": "# REDACTED - set this manually",
+      "PG_DATABASE": "railway"
+    }
+  },
+  "postgres-vambe-prod": {
+    "type": "stdio",
+    "command": "npx",
+    "args": [
+      "-y",
+      "mcp-postgres-server"
+    ],
+    "env": {
+      "PG_HOST": "vambeai-prod-read-replica-1.c70gyemio0h8.us-west-2.rds.amazonaws.com",
+      "PG_PORT": "5432",
+      "PG_USER": "postgres_read",
+      "PG_PASSWORD": "# REDACTED - set this manually",
+      "PG_DATABASE": "railway"
     }
   },
   "vambe-product-os": {
