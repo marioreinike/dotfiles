@@ -63,6 +63,8 @@ C-Enter                Clear screen+scrollback, then execute
 ── Other ──
 prefix + K             Clear screen and scrollback
 prefix + Ctrl+p        Copy pane ID to clipboard
+prefix + Y             Copy last command (text only) to clipboard
+prefix + O             Copy last command + its output to clipboard
 prefix + Ctrl+c        Open VS Code (current dir)
 prefix + A             Agent dashboard (Claude Code monitor)
 prefix + g             Lazygit popup (current dir)

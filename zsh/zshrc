@@ -215,3 +215,51 @@ alias dotfiles="cd ~/REPOS/dotfiles"
 
 # Launch Chrome with remote-debugging-port so the Playwright MCP can attach via CDP.
 alias chrome-debug="/Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome --remote-debugging-port=9222"
+
+# Save the last command AND its output per tmux pane, for the "prefix + O"
+# tmux binding. No marker text is ever printed into the pane (an earlier
+# version tried an "invisible" zero-width-char marker — terminals drop
+# standalone zero-width chars entirely since they have no base glyph to
+# attach to, so it never reached the pane content, and a version before
+# that leaked a visible id string). Instead: preexec snapshots tmux's own
+# row counter (history_size + cursor_y — an ever-increasing count of rows
+# ever written) right as the command starts; precmd snapshots it again
+# right as the command finishes. The difference is exactly how many rows
+# the output took, so precmd just asks tmux for that many trailing rows
+# (+1 for the command's own echoed line) — no pane content is inspected or
+# searched at all. Written to a pane-scoped temp file (needs a file, not a
+# tmux user-option, since output can be long/multi-line — unlike
+# @last_cmd this is not auto-cleaned on pane close).
+if [[ -n "$TMUX_PANE" ]]; then
+  autoload -Uz add-zsh-hook
+  _cmdout_rows_before=""
+  _cmdout_row_count() {
+    local info h y
+    info=$(command tmux display-message -p -t "$TMUX_PANE" '#{history_size} #{cursor_y}' 2>/dev/null) || return 1
+    h=${info%% *} y=${info##* }
+    print -r -- $(( h + y ))
+  }
+  _mark_cmd_start_for_tmux() { _cmdout_rows_before=$(_cmdout_row_count) }
+  add-zsh-hook preexec _mark_cmd_start_for_tmux
+  _save_cmd_output_for_tmux() {
+    [[ -z "$_cmdout_rows_before" ]] && return
+    local rows_before="$_cmdout_rows_before" info h y rows_after delta start end
+    _cmdout_rows_before=""
+    info=$(command tmux display-message -p -t "$TMUX_PANE" '#{history_size} #{cursor_y}' 2>/dev/null) || return
+    h=${info%% *} y=${info##* }
+    rows_after=$(( h + y ))
+    delta=$(( rows_after - rows_before ))
+    (( delta < 0 )) && return
+    # tmux's -S/-E are relative to the top of the CURRENTLY visible screen
+    # (0 = top, negative = into scrollback, positive = down within the
+    # visible pane) — not "N lines back from the bottom". y is the
+    # cursor's current visible row, so end = y-1 is the last real content
+    # row, and start = end-delta reaches back (into scrollback if needed)
+    # to the command's own echoed line.
+    end=$(( y - 1 ))
+    start=$(( end - delta ))
+    command tmux capture-pane -p -t "$TMUX_PANE" -S "$start" -E "$end" 2>/dev/null \
+      > "/tmp/tmux-cmd-output-${TMUX_PANE}.txt"
+  }
+  add-zsh-hook precmd _save_cmd_output_for_tmux
+fi
