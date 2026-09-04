@@ -20,16 +20,6 @@
         "lastUpdated": "2026-07-30T19:16:29.987Z",
         "gitCommitSha": "46f5c53bf3d37a4b4a3e307edc056bb3572f563e"
       }
-    ],
-    "caveman@caveman": [
-      {
-        "scope": "user",
-        "installPath": "/Users/mario/.claude/plugins/cache/caveman/caveman/df2ccd85c94e",
-        "version": "df2ccd85c94e",
-        "installedAt": "2026-09-01T13:39:58.506Z",
-        "lastUpdated": "2026-09-01T13:39:58.506Z",
-        "gitCommitSha": "df2ccd85c94ec3c8289cb62ac020d241ccfb0c60"
-      }
     ]
   }
 }

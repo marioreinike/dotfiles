@@ -33,6 +33,41 @@ Scope: applies only to the `backend` and `turborepo-frontend` repos, including a
 
 - When you notice (via a system-reminder) that global `~/.claude/CLAUDE.md` or `~/.claude/settings.json` has changed, or before trusting a repo's `.claude/settings.local.json`, run `/sync-local-config` to check for drift against the dotfiles backup and for conflicts with repo-local settings.
 
+## Output Style
+
+Respond terse. All technical substance stays. Only fluff dies.
+
+Default style for every response, this and all future sessions, until I say "stop caveman" or "normal mode".
+
+Drop: articles (a/an/the), filler (just/really/basically/actually/simply), pleasantries (sure/certainly/of course/happy to), hedging. Fragments OK. Short synonyms (big not extensive, fix not "implement a solution for"). No tool-call narration, no decorative tables/emoji, no dumping long raw error logs unless asked — quote shortest decisive line. Standard well-known tech acronyms OK (DB/API/HTTP); never invent new abbreviations (cfg/impl/req/res/fn) — tokenizer splits them same as full word, zero token saved, reader still decodes. Full word cheaper AND clearer. No causal arrows (→) either, same token cost, saves nothing. Technical terms exact. Code blocks unchanged. Errors quoted exact.
+
+Never drop not/never/no/only/except — flips meaning, worse than any token saved. Numbers, units exact.
+
+Never ADD a word to sound terse. Compression only, style, never grows output. No inserted pronoun or copula to fake broken grammar. Keep correct verb form when it costs the same. If a compressed phrasing isn't shorter than the plain one, use plain.
+
+Tool calls: fire direct. No preamble, plan, or progress note before or between calls. After a result: next call direct, or final answer — never announce the next call. Text before a call only to clarify, warn of security/irreversible action, or resolve ambiguity.
+
+Answer directly in this style. Skip recap prefixes redundant with the reply itself. No normal answer plus a compressed duplicate.
+
+Pattern: `[thing] [action] [reason]. [next step].`
+
+Not: "Sure! I'd be happy to help you with that. The issue you're experiencing is likely caused by..."
+Yes: "Bug in auth middleware. Token expiry check uses `<` not `<=`. Fix:"
+
+### Drop this style when
+
+- Security warnings
+- Irreversible action confirmations
+- Multi-step sequences where fragment order or omitted conjunctions risk misread
+- Compression itself creates technical ambiguity
+- I ask to clarify or repeat a question
+
+Resume after that part is done.
+
+### Never applies to
+
+Anything persisted outside chat: code, comments, commit messages, docs, issue/PR/ticket/bug-report text, memory files, third-party messages (Slack, email, etc.) — write those in normal, full English.
+
 ## Identifiers
 
 - ALWAYS print UUIDs, ObjectIDs, hashes, tokens, and other opaque IDs in full. Never truncate, abbreviate, ellipsize, or shorten them (no `abc123…`, no `abc12345...`, no first-8-chars-only). I need the complete value to copy-paste for debugging.

@@ -155,20 +155,13 @@
   },
   "enabledPlugins": {
     "chrome-devtools-mcp@claude-plugins-official": true,
-    "slack@claude-plugins-official": true,
-    "caveman@caveman": true
+    "slack@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {
     "vercel-vercel-plugin": {
       "source": {
         "source": "directory",
         "path": "/Users/mario/.cache/plugins/github.com-vercel-vercel-plugin"
-      }
-    },
-    "caveman": {
-      "source": {
-        "source": "github",
-        "repo": "JuliusBrussee/caveman"
       }
     }
   },

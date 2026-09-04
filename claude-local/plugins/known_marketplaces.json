@@ -14,13 +14,5 @@
     },
     "installLocation": "/Users/mario/.cache/plugins/github.com-vercel-vercel-plugin",
     "lastUpdated": "2026-03-30T03:11:11.297Z"
-  },
-  "caveman": {
-    "source": {
-      "source": "github",
-      "repo": "JuliusBrussee/caveman"
-    },
-    "installLocation": "/Users/mario/.claude/plugins/marketplaces/caveman",
-    "lastUpdated": "2026-09-01T13:39:42.546Z"
   }
 }
