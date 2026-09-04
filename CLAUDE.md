@@ -55,7 +55,6 @@ applock/          → Port-lease manager so competing agents don't collide runni
 | `agent-monitor/claude-dashboard` | `~/.local/bin/claude-dashboard` |
 | `agent-monitor/claude-notify` | `~/.local/bin/claude-notify` |
 | `agent-monitor/claude-state-hook` | `~/.local/bin/claude-state-hook` |
-| `agent-monitor/claude-format-hook` | `~/.local/bin/claude-format-hook` |
 | `applock/applock` | `~/.local/bin/applock` |
 | `applock/services.example.json` | (seeds `~/.applock/services.json` on first use; runtime state under `~/.applock/` is NOT tracked) |
 | `claude-local/CLAUDE.md` | `~/.claude/CLAUDE.md` |

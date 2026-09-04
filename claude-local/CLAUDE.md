@@ -25,6 +25,10 @@ Scope: applies only to the `backend` and `turborepo-frontend` repos, including a
 - Default workflow instead: commit the changes, rebase onto the target base branch, push, and open a PR — then let CI run these checks on GitHub and monitor the PR's check runs for me. Report back what passed/failed from there.
 - Only run one of these commands (including ones with a hidden build step) locally if I explicitly ask you to in the moment.
 
+## File Editing
+
+- Always prefer native tools (Edit, Write) over shell commands (`sed`, `awk`, `cat >`, heredocs, `echo >>`) for editing files. Only fall back to shell for cases native tools genuinely can't handle (e.g. binary-safe operations, bulk renames across many files).
+
 ## Config Drift
 
 - When you notice (via a system-reminder) that global `~/.claude/CLAUDE.md` or `~/.claude/settings.json` has changed, or before trusting a repo's `.claude/settings.local.json`, run `/sync-local-config` to check for drift against the dotfiles backup and for conflicts with repo-local settings.
