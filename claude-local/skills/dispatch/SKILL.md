@@ -1,7 +1,7 @@
 ---
 name: dispatch
-description: Workspace dispatcher for git worktrees. Find a free workspace, prepare a new feature (fork branches across the repos you're touching) and launch a Claude session in tmux; report the status of all workspaces (which are free, which still hold unfinished/unmerged work); or, only when explicitly asked for bare/no-worktree, launch a Claude session directly inside a repo clone. Defaults to the workspace/worktree flow (PREPARE) — bare REPO mode requires explicit request. Use when asked to start/prepare a feature, spin up a workspace, dispatch work in a repo, or check workspace/worktree status. Keywords - dispatch, dispatcher, workspace, worktree, bare, no worktree, prepare feature, new feature, free workspace, spin up, ws status, seed prompt, starting prompt, run with model, specific model, effort, reasoning effort, xhigh, claimed workspace, replace claim, take over workspace, kill session.
-argument-hint: status | prepare <feature> in <repos…> [with <model>] [effort <level>] [: <objective>] | repo <alias> bare [with <model>] [effort <level>] [: <objective>]
+description: Workspace dispatcher for git worktrees. Find a free workspace, prepare a new feature (fork branches across the repos you're touching) and launch a Claude session in tmux; report the status of all workspaces (which are free, which still hold unfinished/unmerged work); merge a workspace's nested repos' .claude/{skills,commands,agents} into the workspace root so a session started there can see them; or, only when explicitly asked for bare/no-worktree, launch a Claude session directly inside a repo clone. Defaults to the workspace/worktree flow (PREPARE) — bare REPO mode requires explicit request. Use when asked to start/prepare a feature, spin up a workspace, dispatch work in a repo, check workspace/worktree status, or sync/resync/refresh/merge a workspace's skills, commands, or subagents. Keywords - dispatch, dispatcher, workspace, worktree, bare, no worktree, prepare feature, new feature, free workspace, spin up, ws status, seed prompt, starting prompt, run with model, specific model, effort, reasoning effort, xhigh, claimed workspace, replace claim, take over workspace, kill session, sync skills, sync commands, resync workspace, merge repo skills, refresh claude folder, workspace skills not showing up.
+argument-hint: status | prepare <feature> in <repos…> [with <model>] [effort <level>] [: <objective>] | repo <alias> bare [with <model>] [effort <level>] [: <objective>] | sync [wsN]
 allowed-tools: Bash, Read, Edit, Write, AskUserQuestion
 ---
 
@@ -14,7 +14,7 @@ You manage Mario's worktree-based workflow across two roots:
 
 The alias → repo → base-branch map lives in `${CLAUDE_SKILL_DIR}/repos.conf` (whitespace table). Repos not listed fall back to their `origin/HEAD` default branch. Add a row when you adopt a new alias.
 
-Three modes — **status** (read-only), **prepare** (worktree-based, mutating, always confirm first), and **repo** (launch a session directly inside a `~/REPOS/<repo>` clone, no worktree).
+Four modes — **status** (read-only), **prepare** (worktree-based, mutating, always confirm first), **sync** (merge nested repos' `.claude/{skills,commands,agents}` into the workspace root — mutates only symlinks it owns, no confirmation needed), and **repo** (launch a session directly inside a `~/REPOS/<repo>` clone, no worktree).
 
 **Mode selection defaults to PREPARE.** When asked to dispatch/launch a session for one or more repos, use PREPARE (workspace + worktree) unless the user's wording explicitly asks for bare/no-worktree — e.g. "bare", "no worktree", "directly in the repo clone", "without a worktree". Casual phrasing like "dispatch backend" or "spin up a session in backend" is PREPARE, not REPO. Only fall back to REPO mode on that explicit signal.
 
@@ -79,6 +79,28 @@ For "status of my workspaces", "which workspaces are free", "anything unmerged",
 Present a tidy summary: list **FREE** workspaces first, then **OCCUPIED** ones and *why* (which worktree is dirty, or on an unmerged branch — show branch + ahead/behind). Scan is offline by default; if the user needs the absolute latest, add `--fetch` (or `-f`) instead of manually fetching each repo.
 
 For a **fuller per-repo detail view** instead (branch/base/ahead/behind/tree columns per repo, grouped by workspace), use the separate `repo-status` skill — it wraps this same `ws-scan.sh`, so it's always in sync.
+
+---
+
+## Mode: SYNC
+
+For "sync ws3's claude skills", "resync workspace commands", "merge repo skills into ws1", "refresh the workspace .claude folder", or when a session at a workspace root can't see a command/skill/agent that clearly exists inside one of its nested repos (e.g. "Unknown command: /review-pr" from a workspace root — that repo's `.claude/commands` hasn't been synced, or the running session predates the last sync).
+
+A Claude session started at a workspace root (`~/WORKSPACES/wsN`, not inside any single repo worktree) does not natively discover `.claude/skills`, `.claude/commands`, or `.claude/agents` living inside its nested repo worktrees — Claude Code only discovers those at the exact directory a session starts in (confirmed empirically: neither on-demand discovery nor `alias:command` namespacing reaches across nested `.git` boundaries). This mode fixes that by symlinking them into the workspace root.
+
+```bash
+"${CLAUDE_SKILL_DIR}/scripts/ws-claude-sync.sh" [wsN]
+```
+- No argument → syncs `$PWD`, but only after validating it's actually `$HOME/WORKSPACES/ws1`–`ws9` (errors out otherwise rather than doing something to an arbitrary directory).
+- `wsN` or an absolute path → syncs that workspace regardless of `$PWD`.
+
+What it does: for every nested repo worktree with a `.claude/` dir, symlinks its `skills/*`, `commands/*`, `agents/*` entries into `wsN/.claude/{skills,commands,agents}/`. Collision handling differs by type because identity differs by type (confirmed empirically, not assumed):
+- **Skills** (identity = directory name) and **commands** (identity = filename): a name unique to one repo keeps its bare name; a name shared by multiple repos gets `<alias>-<name>` for every owner, so nothing silently shadows.
+- **Agents** (identity = the `name:` frontmatter field, *not* the filename): renaming the symlink doesn't change what gets exposed — two repos each shipping a `pr-reviewer.md` with `name: pr-reviewer` still collide even when symlinked as `backend-pr-reviewer.md` / `frontend-pr-reviewer.md`. The script keeps the first owner (alphabetical by alias) and prints `warning: agent name '<name>' collides ...` naming who got shadowed. It will not rewrite a repo's frontmatter to resolve this — that's a call for Mario to make in the source repo (rename one's `name:` field so both coexist).
+
+Never touches `wsN/.claude/settings.json`, `settings.local.json`, `hooks/`, or `scheduled_tasks.lock` — those are real, per-workspace state (accumulated permission approvals, scheduled task locks), not managed by this script. Only manages symlinks inside the three subdirectories above; idempotent, safe to rerun any time (after a `git pull` in a repo, after manually adding/removing a worktree, etc).
+
+Report the printed skills/commands/agents counts and relay any `warning:` lines verbatim. **Note the running-session caveat:** a Claude session already running in that workspace loaded its command/skill list at launch — syncing afterward doesn't hot-reload it; the session needs a restart to see the change. New PREPARE launches always get a fresh sync first (see PREPARE step 6), so this mainly matters for resyncing a workspace the user is about to reattach to, or one whose repos changed since it was dispatched.
 
 ---
 
@@ -155,11 +177,7 @@ find "$REPO" -maxdepth 3 \( -name '.env' -o -name '.env.*' \) \
 On confirmation, copy each to the same relative path under `$WT` (`mkdir -p` parents as needed). Existing worktrees (re-forked) already have their env files — skip them.
 
 ### 6. Sync repo skills/commands/agents into the workspace root
-A Claude session started at `$HOME/WORKSPACES/$WS` (the workspace root, not inside any single repo) does not natively see `.claude/skills`, `.claude/commands`, or `.claude/agents` that live inside the nested repo worktrees — Claude Code only discovers those at the exact directory a session starts in. Run:
-```bash
-"${CLAUDE_SKILL_DIR}/scripts/ws-claude-sync.sh" "$WS"
-```
-It symlinks each worktree's `.claude/{skills,commands,agents}` entries into `$HOME/WORKSPACES/$WS/.claude/{skills,commands,agents}` (prefixing on name collisions; see the script header for exactly how skills/commands vs. agents are deduped — agents collide on frontmatter `name:`, not filename). It never touches `$WS/.claude/settings.json`, `settings.local.json`, `hooks/`, or `scheduled_tasks.lock` — those stay real, per-workspace state. Idempotent — safe to rerun. Relay any `warning:` lines it prints (agent name collisions it couldn't resolve automatically) to the user in the step 8 report.
+Run **Mode: SYNC** above against `$WS` (`"${CLAUDE_SKILL_DIR}/scripts/ws-claude-sync.sh" "$WS"`) so the session launched in step 7 can see the repos' skills/commands/agents from the moment it starts. Relay any `warning:` lines it prints in the step 8 report.
 
 ### 7. Launch the Claude session (detached)
 ```bash
