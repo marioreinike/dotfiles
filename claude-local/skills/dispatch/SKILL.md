@@ -100,7 +100,7 @@ tmux list-sessions -F '#{session_name}' 2>/dev/null   # which of them are CLAIME
 ```
 Only workspaces in the FREE list qualify (see Freeness rule above — the whole workspace must be free, not just the requested aliases). Split that list into **unclaimed** (no session named `<ws>` or `<ws>-*`) and **claimed**.
 
-If none qualify → report status and stop. Otherwise pick from **unclaimed first**: prefer one that **already contains worktrees for all requested aliases** (fewest worktrees to create); break ties by lowest number. Set `WS` to its name. If the workspace also holds unrelated worktrees (aliases outside the requested set), note them — they'll need callout in the launch prompt (step 6) so the agent doesn't touch them.
+If none qualify → report status and stop. Otherwise pick from **unclaimed first**: prefer one that **already contains worktrees for all requested aliases** (fewest worktrees to create); break ties by lowest number. Set `WS` to its name. If the workspace also holds unrelated worktrees (aliases outside the requested set), note them — they'll need callout in the launch prompt (step 7) so the agent doesn't touch them.
 
 **If every FREE workspace is claimed → ask Mario, never decide yourself.** Use `AskUserQuestion`: one option per claimed workspace (label `wsN`, description = its live session names, what's running in each pane, and which requested aliases it already has), so he picks whose claim gets replaced. Include a "none — abort" option. For each candidate show what would be killed:
 ```bash
@@ -118,7 +118,7 @@ for S in $(tmux list-sessions -F '#{session_name}' | grep -E "^${WS}(-|$)"); do
   rm -f "$HOME/.cache/dispatch/${S}.prompt"       # stale seed prompt of the evicted session
 done
 ```
-The new dispatch then proceeds normally and gets the fresh name `${WS}-${SLUG}` from step 6 — because the old sessions are gone, the `-2` clash suffix must **not** kick in. If a name collision still shows up after the kills, something else owns that name: stop and report instead of silently suffixing. Killed sessions leave the worktrees exactly as they were (clean + merged, that's why they qualified); step 4 re-forks each requested alias from its base anyway.
+The new dispatch then proceeds normally and gets the fresh name `${WS}-${SLUG}` from step 7 — because the old sessions are gone, the `-2` clash suffix must **not** kick in. If a name collision still shows up after the kills, something else owns that name: stop and report instead of silently suffixing. Killed sessions leave the worktrees exactly as they were (clean + merged, that's why they qualified); step 4 re-forks each requested alias from its base anyway.
 
 **Hard cap: 9 workspaces (`ws1`–`ws9`), never more.** Never create a new `wsN` directory to work around a lack of free workspaces — `~/WORKSPACES` is capped at `ws1..ws9`, all managed manually by Mario. If every existing workspace is BUSY, dispatch **must fail**: report full status (which workspace, which repo, why it's busy) and stop. Do not fall back to creating `ws10` or higher.
 
@@ -154,7 +154,14 @@ find "$REPO" -maxdepth 3 \( -name '.env' -o -name '.env.*' \) \
 ```
 On confirmation, copy each to the same relative path under `$WT` (`mkdir -p` parents as needed). Existing worktrees (re-forked) already have their env files — skip them.
 
-### 6. Launch the Claude session (detached)
+### 6. Sync repo skills/commands/agents into the workspace root
+A Claude session started at `$HOME/WORKSPACES/$WS` (the workspace root, not inside any single repo) does not natively see `.claude/skills`, `.claude/commands`, or `.claude/agents` that live inside the nested repo worktrees — Claude Code only discovers those at the exact directory a session starts in. Run:
+```bash
+"${CLAUDE_SKILL_DIR}/scripts/ws-claude-sync.sh" "$WS"
+```
+It symlinks each worktree's `.claude/{skills,commands,agents}` entries into `$HOME/WORKSPACES/$WS/.claude/{skills,commands,agents}` (prefixing on name collisions; see the script header for exactly how skills/commands vs. agents are deduped — agents collide on frontmatter `name:`, not filename). It never touches `$WS/.claude/settings.json`, `settings.local.json`, `hooks/`, or `scheduled_tasks.lock` — those stay real, per-workspace state. Idempotent — safe to rerun. Relay any `warning:` lines it prints (agent name collisions it couldn't resolve automatically) to the user in the step 8 report.
+
+### 7. Launch the Claude session (detached)
 ```bash
 SESSION="${WS}-${SLUG}"   # already sanitized
 tmux has-session -t "$SESSION" 2>/dev/null && SESSION="${SESSION}-2"   # avoid clash
@@ -164,8 +171,8 @@ Then assemble `MODEL_FLAG`/`EFFORT_FLAG`/`REMOTE_FLAG`. Always write `$PROMPT_FI
 
 Do **not** auto-attach. Tell the user to run: `tmux attach -t "$SESSION"`.
 
-### 7. Report
-Summarize: workspace, session name + attach command, and per repo the branch created, base it forked from, whether the worktree was created or reused, and any env files copied or still pending. Note any unrelated worktrees in the workspace flagged as off-limits to the agent, and — on a takeover — the session names that were killed to free the claim.
+### 8. Report
+Summarize: workspace, session name + attach command, and per repo the branch created, base it forked from, whether the worktree was created or reused, and any env files copied or still pending. Note any unrelated worktrees in the workspace flagged as off-limits to the agent, any skill/command/agent sync warnings from step 6, and — on a takeover — the session names that were killed to free the claim.
 
 ---
 
