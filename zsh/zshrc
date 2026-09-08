@@ -208,6 +208,11 @@ tmux-run() {
 # Per-workspace repo freeness snapshot (branch/base/ahead/behind/tree)
 alias repostatus="$HOME/.claude/skills/repo-status/scripts/repo-status.sh"
 
+# Merge a workspace's nested repos' .claude/{skills,commands,agents} into the
+# workspace root, so a Claude session started there can see them. No arg syncs
+# $PWD (must be a valid ~/WORKSPACES/wsN root); or pass wsN / an absolute path.
+alias wsclaudesync="$HOME/.claude/skills/dispatch/scripts/ws-claude-sync.sh"
+
 alias cla="claude --enable-auto-mode"
 alias clb="claude --dangerously-skip-permissions"
 alias cld="cd ~/REPOS/dotfiles && claude --dangerously-skip-permissions"
