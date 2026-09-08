@@ -38,7 +38,8 @@
       "PG_PORT": "5432",
       "PG_USER": "postgres",
       "PG_PASSWORD": "# REDACTED - set this manually",
-      "PG_DATABASE": "railway"
+      "PG_DATABASE": "railway",
+      "PGOPTIONS": "-c statement_timeout=120000"
     }
   },
   "postgres-vambe-prod": {
@@ -53,7 +54,8 @@
       "PG_PORT": "5432",
       "PG_USER": "postgres_read",
       "PG_PASSWORD": "# REDACTED - set this manually",
-      "PG_DATABASE": "railway"
+      "PG_DATABASE": "railway",
+      "PGOPTIONS": "-c statement_timeout=120000"
     }
   },
   "vambe-product-os": {
