@@ -80,7 +80,7 @@
     ],
     "defaultMode": "auto"
   },
-  "model": "sonnet",
+  "model": "opus",
   "hooks": {
     "Notification": [
       {
@@ -171,12 +171,15 @@
       "effortLevel": "high"
     },
     "claude-sonnet-5": {
-      "effortLevel": "medium"
+      "effortLevel": "low"
     },
     "claude-opus-5": {
-      "effortLevel": "xhigh"
+      "effortLevel": "high"
     },
     "claude-fable-5-1": {
+      "effortLevel": "high"
+    },
+    "claude-opus-5-5": {
       "effortLevel": "high"
     }
   },
@@ -186,5 +189,42 @@
   "editorMode": "normal",
   "agentPushNotifEnabled": true,
   "skipAutoPermissionPrompt": true,
+  "autoMode": {
+    "allow": [
+      "$defaults",
+      "Bash(vercel:*) in ~/REPOS/turborepo-frontend for routine deploy-status/inspect operations (27× usage, no denials recorded against it)"
+    ],
+    "soft_deny": [
+      "$defaults",
+      "Bash(vercel:*) production/promote subcommands in ~/REPOS/turborepo-frontend (prod deploy risk under Sensitive remote targets heuristic)"
+    ],
+    "environment": [
+      "### Org-wide",
+      "**Organization**: vambeai (GitHub org — repo remote github.com:vambeai/vambe-turborepo-frontend.git)",
+      "**Cloud provider(s)**: AWS (S3 bucket referenced in repo docs), GCP (gcloud secrets marker, GCP_SA_KEY in CI), Vercel (deploy target)",
+      "**Repository visibility**: private (confirmed via gh)",
+      "**Internal sharing / snippet hosting**: None configured — treat public paste/gist services as outside the trust boundary",
+      "**Secrets management**: gcloud secrets (secrets-manager marker); CI secret names referenced include DATADOG_API_KEY, GCP_SA_KEY, NPM_TOKEN, SLACK_BOT_TOKEN, SLACK_CHANNEL_ID, TURBO_TEAM, TURBO_TOKEN, VERCEL_* project IDs and VERCEL_TOKEN, VERCEL_ORG_ID — treat as CI-managed, not local",
+      "**Default / protected branches**: main (default); rulesets active — \"Require pull request for dev\" and \"unapproved PR for main\" (classic protected-branches query not queryable here, but rulesets cover main and dev)",
+      "**CI/CD deploy targets**: Vercel (per-app projects: mercur, ads, axis, iris, help-center, landing-form, login, appointments — via VERCEL_*_PROJECT_ID secrets and .github/workflows)",
+      "**Network posture**: None configured",
+      "**Host containment**: None configured — assume Claude Code runs on an ordinary developer machine or CI runner with open internet",
+      "**Source control**: The trusted repo (vambeai/vambe-turborepo-frontend) and its origin remote only",
+      "**Trusted internal domains**: None configured",
+      "**Trusted cloud buckets**: vambe-bkt (S3, referenced in .claude/skills/gifs.md for GIF assets under vambe-gifs/ prefix) (config-derived — not a confirmed upload destination; uploads of local data still require confirmation)",
+      "**Key internal services**: None configured",
+      "**Internal package registry**: npm.pkg.github.com (GitHub Packages registry host, from config scan)",
+      "**Sensitive data locations & audiences**: .env* files (apps/iris/.env, apps/mercur/.env, apps/mercur/.env.blue.local, apps/mercur/.env.local, .envrc), gitignored — Firebase auth keys (FIREBASE_PRIVATE_KEY, COOKIE_SECRET_CURRENT/PREVIOUS) and other app secrets; share only with audiences cleared at the [named+specifics] bar",
+      "**Data retention / declassification**: None configured",
+      "**Sensitive remote targets**: any deploy/infra namespace, host, or container (e.g. Vercel/K8s/cloud deploy targets) whose name carries `prod` or `production` as a whole word or name segment — this heuristic does NOT apply to read-only DB connection aliases such as postgres-vambe-prod or mongo-vambe (query-only MCP servers, not deploy targets); those are allowed",
+      "**Protected deployment namespaces / environments**: None configured — fall back to the Sensitive remote targets heuristic",
+      "**Protected IaC scopes**: IAM, RBAC, networking, quota, and node-pool resources; anything whose name or tag carries `prod` or `production` as a whole word or name segment (deploy/infra resources only, not DB connection aliases — see Sensitive remote targets)",
+      "### User-specific",
+      "**Primary use of Claude Code**: software development (Vambe monorepo frontend — Turborepo + pnpm, Next.js apps)",
+      "**Trusted repo**: ~/REPOS/turborepo-frontend (vambeai/vambe-turborepo-frontend) and its origin remote; private repo — confidential material OK to commit/push here, but secrets and PII are never cleared by visibility",
+      "**Org-specific CLIs**: vercel (27× in this project's transcripts); tf/terraform, aws, gh, op (1Password CLI), gcloud seen in shell history but not corroborated in this project's transcripts",
+      "routine under this repo's apps/*, packages/* prefixes (k8s -n flags seen: packages, apps — likely turborepo filter scopes, not k8s namespaces)"
+    ]
+  },
   "voiceEnabled": true
 }
