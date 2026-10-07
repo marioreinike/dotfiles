@@ -83,7 +83,7 @@ case "$cmd" in
     install_harness
     echo "harness $fresh: $dest"
     if is_up; then
-      echo "ui-preview already running (reused): http://127.0.0.1:$(server_port)/"
+      echo "server REUSED (someone else started it, leave it running): http://127.0.0.1:$(server_port)/"
       exit 0
     fi
     [[ -d "$dest/.vite" ]] || echo "cold start: first shoot also pre-bundles deps (~30-60s)"
@@ -95,7 +95,7 @@ case "$cmd" in
     echo "{\"pid\": $!, \"port\": $port, \"repo\": \"$repo\", \"app\": \"$app\"}" > "$state_file"
     for _ in $(seq 1 120); do
       if is_up; then
-        echo "ui-preview running: http://127.0.0.1:$port/"
+        echo "server STARTED by you (run stop when done): http://127.0.0.1:$port/"
         exit 0
       fi
       kill -0 "$(server_pid)" 2>/dev/null || { echo "error: vite exited, log:" >&2; tail -30 "$dest/vite.log" >&2; exit 1; }

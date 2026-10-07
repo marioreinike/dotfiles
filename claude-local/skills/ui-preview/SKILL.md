@@ -58,6 +58,7 @@ Vite harness (no Next.js) that renders a component with mercur's providers and f
 4. **Inspect**: Read **all contact sheets in one parallel batch**. Open a single state's PNG only to zoom in on something suspicious. Go through the checklist below and report concrete defects with cause and fix.
 5. **Iterate**: after a code fix, shoot only the affected states. Vite serves the edits with no restart.
 6. **Upload** (rules below), then `$S stop` unless `start` said `reused`.
+7. **Show the user**: end your reply with the `### Screenshots` block that `shoot` printed (gallery + `file://` link per state), defect states first and marked ⚠.
 
 ## Defect checklist (frequent in this codebase)
 

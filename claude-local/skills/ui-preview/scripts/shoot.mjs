@@ -216,6 +216,31 @@ await browser.close();
 
 fs.writeFileSync(path.join(out, "report.json"), JSON.stringify(results, null, 2));
 
+// Human gallery: one page with every state at full resolution, relative links
+// so it works straight from disk (file://) and keeps working if the dir moves.
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const gallery = path.join(out, "index.html");
+fs.writeFileSync(
+  gallery,
+  `<!doctype html><meta charset="utf-8"><title>ui-preview · ${esc(path.basename(out))}</title>
+<style>body{margin:0;padding:16px;background:#e2e8f0;font:13px system-ui;color:#0f172a}
+h1{font-size:16px;margin:0 0 12px}main{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start}
+figure{margin:0;background:#fff;padding:8px;border-radius:8px;max-width:100%}
+figcaption{font-weight:600;margin-bottom:6px}figcaption small{color:#b45309;font-weight:500}
+img{display:block;max-width:min(640px,100%);height:auto}a{color:inherit}</style>
+<h1>${esc(path.basename(out))} · ${results.length} states</h1><main>${results
+    .map((r) => {
+      const name = path.basename(r.file);
+      const warn = [r.failure && "failed", r.unmocked?.length && "unmocked", r.errors?.length && "errors"]
+        .filter(Boolean)
+        .join(", ");
+      return `<figure><figcaption>${esc(`${r.scenario}:${r.state}`)}${warn ? ` <small>⚠ ${esc(warn)}</small>` : ""}</figcaption>${
+        fs.existsSync(r.file) ? `<a href="${esc(name)}"><img src="${esc(name)}" loading="lazy"></a>` : "<p>no image</p>"
+      }</figure>`;
+    })
+    .join("")}</main>`,
+);
+
 const dirty = results.filter(
   (r) => r.failure || r.ready === false || r.unmocked?.length || r.errors?.length,
 ).length;
@@ -234,3 +259,14 @@ for (const r of results) {
 }
 console.log(`full report: ${path.join(out, "report.json")}`);
 if (sheets.length) console.log(`contact sheets (read these first, ${SHEET_SIZE} states each):\n  ${sheets.join("\n  ")}`);
+// Ready-to-relay markdown for the user (the agent marks defect states with ⚠ and moves them first).
+console.log(
+  [
+    "\nscreenshots block for the user (copy into the report; mark defect states with ⚠ and put them first):",
+    "### Screenshots",
+    `- [Gallery: all ${results.length} states](file://${gallery})`,
+    ...results
+      .filter((r) => fs.existsSync(r.file))
+      .map((r) => `- [${r.scenario}:${r.state}](file://${r.file})`),
+  ].join("\n"),
+);

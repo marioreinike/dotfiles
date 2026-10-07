@@ -16,6 +16,11 @@ These apply to every Claude Code session, across all projects.
 - When launching background agents (Agent/Workflow tool calls), consider matching the model (Sonnet, Opus, or Fable) and reasoning effort to the task's complexity, rather than always defaulting to the inherited model.
 - If you choose a different model than the current session's default for a specific agent, state which model (and effort, if non-default) before launching it.
 
+## UI Verification Screenshots
+
+- Whenever the `ui-verifier` agent finishes (or you run the `ui-preview` skill yourself), show me the generated screenshots in your reply as clickable markdown links with `file://` URLs, so I can open them from the session. Put the gallery (`index.html`) first, then one link per state, with defect states first and marked ⚠.
+- Relay the agent's "Screenshots" block verbatim. If it is missing, build the links yourself from the screenshot directory it reports (`ls` the dir). Never just say where the images are, and never drop this block for brevity.
+
 ## Local Resource Limits
 
 Scope: applies only to the `backend` and `turborepo-frontend` repos, including any of their git worktrees (e.g. checkouts under `~/WORKSPACES/*`). Not a general rule for every project.
