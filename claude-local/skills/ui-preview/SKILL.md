@@ -1,57 +1,76 @@
 ---
 name: ui-preview
-description: Fast visual check of frontend components in the turborepo-frontend monorepo (mercur, @vambe/* packages) without running the Next.js app. Mounts a component in a small Vite harness with the real Tailwind/theme/i18n, mocks the API at the axios layer (or a hook via module mocks), screenshots every state (default, loading, empty, error, dark, opened popovers) with headless Chrome, then the agent reads the PNGs to check the UI. Use after creating or changing a React component or page in turborepo-frontend, or when asked to see, preview, screenshot, or visually test UI. Keywords - ui preview, visual test, screenshot component, storybook alternative, verify ui, render component, mock api, frontend states.
+description: Fast visual check of frontend components in the turborepo-frontend monorepo (mercur, @vambe/* packages) without running the Next.js app. Mounts a component in a small Vite harness with the real Tailwind/theme/i18n, mocks the API at the axios layer (or a hook via module mocks), screenshots every state (default, loading, empty, error, retry, overflow, dark, locales, opened popovers) with headless Chrome into contact sheets the agent reads to check the UI. Use after creating or changing a React component or page in turborepo-frontend, or when asked to see, preview, screenshot, or visually test UI. Keywords - ui preview, visual test, screenshot component, storybook alternative, verify ui, render component, mock api, frontend states.
 allowed-tools: Bash, Read, Write, Edit
 ---
 
 # ui-preview
 
-Vite harness (no Next.js) that renders one component with mercur's providers and fixture-backed API. Start ~3s, a screenshot pass takes seconds. Running this Vite server locally is approved. It is not a typecheck/build/test command, and those stay forbidden in this repo.
+Vite harness (no Next.js) that renders a component with mercur's providers and fixture-backed API. Running this Vite server locally is approved. It is not a typecheck/build/test command, and those stay forbidden in this repo.
 
 `S=~/.claude/skills/ui-preview/scripts/ui-preview.sh` (all commands take `--repo PATH`, default = git toplevel of `$PWD`, worktrees OK; `--app mercur` is the only app wired so far)
 
 ## Workflow
 
-1. **Start**: `$S start`. It installs the harness into `apps/mercur/.ui-preview/` (git-excluded through `info/exclude`, never commit it) and prints the URL. It is idempotent: if the server is already running for this checkout, it reuses it.
-2. **Pick targets**: from `git diff --name-only <base>...HEAD`, choose the components a user would see that render the change. Previewing every file is unnecessary.
-3. **Write a scenario** at `$($S path)/scenarios/<name>.preview.tsx` (the API is in [reference.md](reference.md)):
+1. **Start + context, in one call**: `$S start && $S context [--base origin/dev] [files...]`.
+   - `start` installs the harness into `apps/mercur/.ui-preview/` (git-excluded, never commit it). If a server is already running, it says `reused`.
+   - `context` prints, for each changed component: the import line and props type, every `@vambe/api` hook resolved to a **ready fixture key** (`"GET /call-guide"`) with its response type file and whether to write snake_case, the hook's retry policy, other hooks that may need providers, who renders the component, any **existing scenarios to extend**, and the changed i18n keys side by side in every locale.
+   - `⚠` lines are deterministic findings: `TERMINOLOGY` (a new string renames an established product term, e.g. pt "guia de chamada" vs "guia de ligação") and `UNTHEMED COLORS` (classes that do not flip in dark mode). Put them in your report unless a screenshot disproves them.
+   - Trust this output. Open source files only for the props types and the response type, plus the diff of the component to learn which states it adds.
+2. **Write or extend a scenario** at `$($S path)/scenarios/<component-name>.preview.tsx`. Name it after the component, so later runs reuse it.
    ```tsx
    import { CallGuidePicker } from "@vambe/templates/src/call-guide/call-guide-picker";
-   import { definePreview, fail, pending } from "ui-preview";
-   const guides = [{ id: "g1", name: "Post-venta", objective_text: "…", assistant_id: null }];
-   const view = () => <div style={{ width: 420 }}><CallGuidePicker selectedGuideId={null} onSelect={() => {}} onClear={() => {}} /></div>;
+   import { Box, definePreview, fail, pending, sequence } from "ui-preview";
+   const guides = [{ id: "g1", client_id: "c1", name: "Post-venta", objective_text: "…", assistant_id: null }]; // snake_case
+   const view = (w = 420) => () => <Box width={w}><CallGuidePicker selectedGuideId={null} onSelect={() => {}} onClear={() => {}} /></Box>;
    const open = [{ click: "button[aria-expanded]" }];
    export default definePreview({
-     title: "Call guide picker",
-     api: { "GET /call-guide": guides },            // raw backend shape: snake_case
+     title: "CallGuidePicker",
+     api: { "GET /call-guide": guides },
      states: {
-       default: view,
-       open: { render: view, interact: open },
-       loading: { render: view, api: { "GET /call-guide": pending() }, interact: open },
-       empty: { render: view, api: { "GET /call-guide": [] }, interact: open },
-       error: { render: view, api: { "GET /call-guide": fail(500) }, interact: open },
-       dark: { render: view, theme: "dark", interact: open },
+       open: { render: view(), interact: open },
+       loading: { render: view(), api: { "GET /call-guide": pending() }, interact: open },
+       empty: { render: view(), api: { "GET /call-guide": [] }, interact: open },
+       error: { render: view(), api: { "GET /call-guide": fail(500) }, interact: open },
+       "retry-in-flight": { render: view(), api: { "GET /call-guide": sequence([fail(500), 4], pending()) },
+         interact: [...open, { click: "text=Reintentar" }, { wait: 300 }] },
+       narrow: { render: view(220), api: { "GET /call-guide": fail(500) } },
+       "dark-loading": { render: view(), theme: "dark", api: { "GET /call-guide": pending() }, interact: open },
+       "pt-error": { render: view(), locale: "pt", api: { "GET /call-guide": fail(500) }, interact: open },
      },
    });
    ```
-   Cover each state the change touches: loading, empty, error, the moment right after a user retry/refetch, long text or overflow, disabled, dark mode, and opened overlays (via `interact`). For overflow, use a fixed-width wrapper with a visible `outline`: the default crop grows with overflowing content rather than clipping it. Use realistic data: shapes come from `packages/types/<domain>` and paths from `packages/api/src/<domain>/infrastructure/`. The `vambe-dbs` skill (dev DB) can supply real-looking rows.
-4. **Shoot**: `$S shoot [scenario[:state] ...]` (no targets = every state of every scenario). It writes PNGs plus `report.json` to `$($S path)/out/latest/`, which is **overwritten on every run**: pass `--out <scratchpad dir>` to keep a set, or whenever another agent may share the checkout. It prints a summary line (`all clean`, or N states with problems) and, per state, `unmocked:` requests, errors, and timeouts. The first shoot after a cold start also pre-bundles deps (~30-60s).
-   - `unmocked: GET /x`: add a fixture, then shoot again. Without one, the request answers 501 and the UI shows its error path.
+   **State matrix**: build every row that applies to the change.
+   - Data states: default, loading, empty, error (5xx and 4xx when retry policies differ).
+   - Transitions: **retry/refetch in flight**, and retry then success. Use `sequence(...)`: the first item answers the first call, and so on.
+   - Edge content: long text in a narrow `Box`, disabled/selected variants.
+   - Each prop variant the diff touches.
+   - Dark mode for the new visuals.
+   - One state per locale whose strings changed.
+   - Open overlays via `interact`.
+
+   Text selectors must match the state's locale, which is **es** by default (`text=Reintentar`, not `text=Retry`). Take the strings from `context`, or prefer ARIA selectors (`button[aria-expanded]`, `[role=option]`). A failing step stops after 5s and lists the clickable texts.
+
+   API details are in [reference.md](reference.md). Only open it for module mocks, `wrapper` providers, or troubleshooting.
+3. **Shoot**: `$S shoot --out "$($S path)/out/<component>-$(date +%H%M%S)" [scenario[:state] ...]` (no targets = every state). It prints a summary line, problems per state, and **contact sheets** (labelled grids of 6 states). The first shoot after a cold start pre-bundles deps (~30-60s).
+   - `unmocked: GET /x`: add a fixture, then shoot again.
    - A red "Render error" box or `useX must be used within Provider`: add that provider with `wrapper` (see reference).
-5. **Inspect**: Read every PNG. Check layout, spacing, alignment, truncation and overflow, loading/empty/error visuals, dark-mode contrast, and raw i18n keys (e.g. `call-guide.placeholder` means a missing translation). Report concrete defects, not impressions.
-6. **Iterate**: edit the code, then shoot again. Vite serves the edits with no restart. Edits to `mocks.json` restart the server automatically.
-7. **Upload** (rules below), then `$S stop` when done with UI work in this checkout.
+4. **Inspect**: Read **all contact sheets in one parallel batch**. Open a single state's PNG only to zoom in on something suspicious. Go through the checklist below and report concrete defects with cause and fix.
+5. **Iterate**: after a code fix, shoot only the affected states. Vite serves the edits with no restart.
+6. **Upload** (rules below), then `$S stop` unless `start` said `reused`.
 
-## Mocking
+## Defect checklist (frequent in this codebase)
 
-- **API (default)**: the `api` key in a scenario or state. Every `@vambe/api` call (axios) plus cross-origin and `/api/*` fetches go through fixtures; nothing reaches a real backend. Auth is a fake signed-in user (customize with `user`, `profile`, `auth`).
-- **Hooks or modules**: use `.ui-preview/mocks.json` when the data does not come from HTTP (sockets, contexts, browser APIs) or to force a hook state. It matches on the resolved file, so barrel imports are covered. See reference.
+- **Truncation/overflow**: `truncate` needs `min-w-0` (or `overflow-hidden`) on every flex ancestor up to the sized box. A `Button` with `flex-1` and no `min-w-0` never shrinks. Radix Popover content takes the trigger's width, so a wide trigger means a wide popover.
+- **React Query v5 transitions**: refetching an errored query with no data turns `isLoading` true again. A Retry click then swaps the error UI for the loading UI (a flicker/layout shift), and spinners tied to `isFetching` never show. Always capture the `retry-in-flight` state.
+- **Dark-mode colors**: most palettes (`slate`, `blue`, `red`, …) are var-backed and flip in dark mode, so `text-slate-500` is fine. `bg-white`, `bg-black`, `text-black` and un-themed palettes do not flip; `context` flags them (`UNTHEMED COLORS`). Prefer `bg-card` and `bg-background`. Check the dark shots.
+- **Copy**: act on the `TERMINOLOGY` flags. Also compare the changed keys across es/en/pt and the tone of neighbouring keys. A raw key in a shot (e.g. `call-guide.retry`) means a missing translation.
+- **Layout shift between states**: the height or width jumps, or inputs or footers appear and disappear between loading, error and success.
+- **Dark mode**: skeleton, border and muted-text contrast.
 
 ## Upload rules
 
-Screenshots always stay local. Upload only to entities that **already exist** for this work. Never create a PR, artifact, or task just to host screenshots. Decide whether an upload adds value (UI changed, reviewer benefits); skip it for throwaway iterations. Upload the final set once rather than every iteration, and curate it: the key states (about 12 at most), skipping near-duplicates.
+Screenshots always stay local. Upload only to entities that **already exist** for this work. Never create a PR, artifact, or task just to host screenshots. Upload the final set once rather than every iteration, and curate it: about 12 key individual PNGs at most, with no near-duplicates (the contact sheets are for review, not for upload).
 - **PR exists** for the branch (`gh pr view` succeeds): `~/.claude/skills/ui-preview/scripts/upload-pr.sh --repo <repo> --comment --note "<what the shots show + defects found>" <abs png paths...>`. The push goes over SSH through 1Password and may wait for a Touch ID approval. If all 3 attempts fail, tell the user and rerun.
 - **ClickUp task** linked to the work (from the conversation, branch name, or PR body): attach the PNGs (see reference).
 - **Artifact** already published in this session for this work: republish it with the screenshots as supporting files.
-
-Details, limitations and troubleshooting: [reference.md](reference.md).

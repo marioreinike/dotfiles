@@ -45,13 +45,14 @@ The value can be:
 
 Write bodies in the **raw backend shape (snake_case)**. Infrastructure calls that use `camelize: true` get camelized by the real axios interceptor, and the ones that don't use it expect raw data anyway. The infrastructure file for the domain shows the exact path and verb. Hooks that define their own `retry` (e.g. retry 5xx 3×) still retry, just without delay. Use a 4xx when you want a single attempt.
 
-A function fixture can return any of the values above, including `res`, `pending()` and `fail()`. Every state loads a fresh page, so module-level variables in the scenario reset between states. That makes call counters safe. For example, "fail through the hook's retries, then hang on the user's manual Retry" captures the retrying UI:
-```tsx
-let calls = 0;
-const failThenHang = () => (++calls <= 4 ? fail(500) : pending()); // 1 try + 3 retries, then the Retry click
-// state: { render: view, api: { "GET /call-guide": failThenHang },
-//          interact: [{ click: "button[aria-expanded]" }, { wait: 300 }, { click: "[role=alert] button" }, { wait: 300 }] }
-```
+- `sequence(...steps)`: successive calls get successive steps, and the last step repeats. A step is a value or `[value, times]`. Use it for transitions:
+  - `sequence([fail(500), 4], pending())`: the first try and 3 hook retries fail, then the user's Retry hangs, which captures the retry-in-flight UI.
+  - `sequence([fail(500), 4], data)`: the same, but the Retry succeeds.
+  - Count the hook's attempts from its `retry` policy, which `context` prints.
+
+A function fixture can return any of the values above. Every state loads a fresh page, so `sequence` counters and module-level variables reset between states.
+
+`<Box width={220}>`: a fixed-width wrapper with a dashed red outline. Use it for truncation and overflow states, so the screenshot shows where the container ends. The default crop grows with overflowing content rather than clipping it.
 
 For `interact`, prefer stable selectors: ARIA attributes (`button[aria-expanded]`, `[role=alert] button`, `[role=option]`), `input[placeholder*=…]`, or `text=Reintentar` (Playwright selector syntax works).
 

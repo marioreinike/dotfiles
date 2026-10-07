@@ -5,6 +5,7 @@
 #   ui-preview.sh stop   [--repo PATH] [--app mercur]
 #   ui-preview.sh status [--repo PATH] [--app mercur]
 #   ui-preview.sh path   [--repo PATH] [--app mercur]   print harness dir (scenarios/ lives there)
+#   ui-preview.sh context [--repo PATH] [--base origin/dev] [file...]   pre-digest the change for scenarios
 #   ui-preview.sh shoot  [--repo PATH] [--app mercur] [--out DIR] [--viewport WxH] [--scale N] [target...]
 #                        target = scenario id or scenario:state; default = every state of every scenario
 #
@@ -124,6 +125,9 @@ case "$cmd" in
     ;;
   path)
     echo "$dest"
+    ;;
+  context)
+    node "$SKILL_DIR/scripts/context.mjs" --repo "$repo" --harness "$dest" ${rest[@]+"${rest[@]}"}
     ;;
   shoot)
     is_up || { echo "error: server not running, run: $0 start --repo $repo --app $app" >&2; exit 1; }

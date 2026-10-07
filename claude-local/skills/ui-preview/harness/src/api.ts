@@ -1,5 +1,5 @@
 // Public API for scenario files: `import { definePreview, res } from "ui-preview"`.
-import type { ReactNode } from "react";
+import { createElement, type ReactNode } from "react";
 
 export interface PreviewRequest {
   method: string;
@@ -100,3 +100,31 @@ export const pending = (): FixtureResponse => res(null, { delay: Infinity });
 
 export const fail = (status = 500, data: unknown = { message: "ui-preview error" }) =>
   res(data, { status });
+
+/**
+ * Answers successive calls with successive steps; the last step repeats.
+ * A step is a value or `[value, times]`. Each state is a fresh page, so counts reset.
+ *   sequence([fail(500), 4], pending())   // 1 try + 3 hook retries fail, user's Retry hangs
+ *   sequence([fail(500), 4], guides)      // ...and the Retry succeeds
+ */
+export function sequence(...steps: Array<FixtureValue | [FixtureValue, number]>) {
+  const flat: FixtureValue[] = [];
+  for (const step of steps) {
+    if (Array.isArray(step) && step.length === 2 && typeof step[1] === "number") {
+      for (let i = 0; i < step[1]; i++) flat.push(step[0]);
+    } else {
+      flat.push(step);
+    }
+  }
+  let calls = 0;
+  return () => flat[Math.min(calls++, flat.length - 1)];
+}
+
+/** Fixed-width box with a visible dashed outline, for truncation/overflow states. */
+export function Box({ width, children }: { width: number; children: ReactNode }) {
+  return createElement(
+    "div",
+    { style: { width, outline: "1px dashed #ef4444", outlineOffset: 2 } },
+    children,
+  );
+}

@@ -56,14 +56,16 @@ async function readIndex() {
   return index;
 }
 
-// Crop to the rendered content (frame children + portals such as popovers), padded.
+// Crop to the rendered content (frame content + portals such as popovers), padded.
+// Descendants count too, so content overflowing a fixed-width wrapper stays visible.
 async function contentClip(page) {
   return page.evaluate(() => {
+    const portals = [...document.body.children].filter(
+      (el) => el.id !== "preview-root" && el.tagName !== "SCRIPT" && el.tagName !== "STYLE",
+    );
     const nodes = [
-      ...document.querySelectorAll("#ui-preview-frame > *"),
-      ...[...document.body.children].filter(
-        (el) => el.id !== "preview-root" && el.tagName !== "SCRIPT" && el.tagName !== "STYLE",
-      ),
+      ...document.querySelectorAll("#ui-preview-frame *"),
+      ...portals.flatMap((el) => [el, ...el.querySelectorAll("*")]),
     ];
     let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
     for (const el of nodes) {
@@ -84,12 +86,31 @@ async function contentClip(page) {
   });
 }
 
+// Steps fail fast (5s) and name themselves, so a wrong selector (e.g. English
+// text on the default es locale) costs seconds, not Playwright's 30s default.
 async function runStep(page, step) {
-  if ("click" in step) await page.click(step.click);
-  else if ("hover" in step) await page.hover(step.hover);
-  else if ("fill" in step) await page.fill(step.fill, step.value);
-  else if ("press" in step) await page.keyboard.press(step.press);
-  else if ("wait" in step) await page.waitForTimeout(step.wait);
+  const timeout = 5000;
+  try {
+    if ("click" in step) await page.click(step.click, { timeout });
+    else if ("hover" in step) await page.hover(step.hover, { timeout });
+    else if ("fill" in step) await page.fill(step.fill, step.value, { timeout });
+    else if ("press" in step) await page.keyboard.press(step.press);
+    else if ("wait" in step) await page.waitForTimeout(step.wait);
+  } catch (err) {
+    const visible = await page
+      .evaluate(() =>
+        [...document.querySelectorAll("button, [role=button], [role=option], a, input")]
+          .filter((el) => el.getBoundingClientRect().width > 0)
+          .map((el) => el.getAttribute("aria-label") || el.textContent?.trim() || el.getAttribute("placeholder") || el.tagName)
+          .filter(Boolean)
+          .slice(0, 12),
+      )
+      .catch(() => []);
+    throw new Error(
+      `interact step ${JSON.stringify(step)} failed (${err.message.split("\n")[0]}). ` +
+        `Clickable now: ${JSON.stringify(visible)}`,
+    );
+  }
 }
 
 const index = await readIndex();
@@ -162,6 +183,35 @@ await Promise.all(
     }
   }),
 );
+// Contact sheets: labelled grids of up to 6 states, so a reviewer (human or agent)
+// reads a handful of images instead of one per state. Individual PNGs stay for zooming.
+const SHEET_SIZE = 6;
+const sheets = [];
+const shot = results.filter((r) => !r.failure && fs.existsSync(r.file));
+for (let i = 0; i < shot.length; i += SHEET_SIZE) {
+  const chunk = shot.slice(i, i + SHEET_SIZE);
+  const cells = chunk
+    .map((r) => {
+      const flag = r.unmocked?.length || r.errors?.length || r.ready === false ? " ⚠" : "";
+      const data = fs.readFileSync(r.file).toString("base64");
+      return `<figure><figcaption>${r.scenario}:${r.state}${flag}</figcaption><img src="data:image/png;base64,${data}"></figure>`;
+    })
+    .join("");
+  // Tiny viewport height: the full-page shot then equals the grid's own height.
+  const page = await browser.newPage({ viewport: { width: 1200, height: 100 } });
+  await page.setContent(
+    `<style>body{margin:0;padding:12px;background:#94a3b8;font:600 13px system-ui}
+      main{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+      figure{margin:0;background:#fff;padding:6px;border-radius:6px}
+      figcaption{margin-bottom:4px;color:#0f172a}
+      img{display:block;max-width:100%;max-height:420px;object-fit:contain;object-position:left top}</style>
+     <main>${cells}</main>`,
+  );
+  const file = path.join(out, `sheet-${sheets.length + 1}.png`);
+  await page.screenshot({ path: file, fullPage: true });
+  await page.close();
+  sheets.push(file);
+}
 await browser.close();
 
 fs.writeFileSync(path.join(out, "report.json"), JSON.stringify(results, null, 2));
@@ -183,3 +233,4 @@ for (const r of results) {
   for (const e of (r.errors ?? []).slice(0, 5)) console.log(`    ${e.split("\n")[0].slice(0, 300)}`);
 }
 console.log(`full report: ${path.join(out, "report.json")}`);
+if (sheets.length) console.log(`contact sheets (read these first, ${SHEET_SIZE} states each):\n  ${sheets.join("\n  ")}`);
