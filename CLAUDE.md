@@ -16,7 +16,7 @@ This repo is Mario's personal dotfiles/setup repository. It stores all computer 
 ```
 .claude/          → Project-level: sync skills and repo permissions (NOT backed up configs)
 claude-local/     → Mirror of ~/.claude/ (backup for restoring on a new computer)
-git/              → Git config (~/.gitconfig, includes delta diff config) and global gitignore (~/.config/git/ignore)
+git/              → Git config (~/.gitconfig, includes delta diff config), global gitignore (~/.config/git/ignore) and `git aic` AI-commit script (~/.local/bin/git-aic)
 lazygit/          → Lazygit config (~/.config/lazygit/config.yml)
 zsh/              → Zsh shell config (~/.zshrc) and Powerlevel10k theme (~/.p10k.zsh)
 atuin/            → Atuin shell history config (~/.config/atuin/config.toml)
@@ -37,6 +37,7 @@ applock/          → Port-lease manager so competing agents don't collide runni
 | `git/gitconfig` | `~/.gitconfig` |
 | `git/gitignore_global` | `~/.config/git/ignore` |
 | `git/hooks/pre-push` | `~/.config/git/hooks/pre-push` (global hooks dir, set via `core.hooksPath`) |
+| `git/git-aic` | `~/.local/bin/git-aic` (`git aic`: commit with a message written by `claude -p` via the `commit-style` skill) |
 | `lazygit/config.yml` | `~/.config/lazygit/config.yml` |
 | `zsh/zshrc` | `~/.zshrc` |
 | `zsh/p10k.zsh` | `~/.p10k.zsh` |
@@ -100,6 +101,7 @@ So delta's appearance inside lazygit is controlled by the `[delta "lazygit"]` se
 - `lt` → `ls -lht`
 - `py` → python3, `tf` → terraform
 - `cdwt <branch>` → navigate to git worktree by branch name
+- `git aic` → `git commit` with a Claude-written message (`-a`, `-y` skip editor, `--amend`, `-p` print only; `GIT_AIC_MODEL` overrides the default `sonnet`)
 - Git: `pl`=pull, `ps`=push, `cm`=commit -m, `s`=status, `ch`=checkout, `l`=log --oneline
 
 ## Claude Code Skills and Commands

@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+# git aic — `git commit` with an AI-written message.
+#
+# Generates the message with Claude Code (`claude -p`, so it runs on the
+# Claude subscription, not an API key) by invoking the `commit-style` skill
+# on the staged diff, then hands off to `git commit` with any extra args.
+#
+# Usage:
+#   git aic                 # message for staged changes, opens editor to review
+#   git aic -a              # stage tracked changes first (like `git commit -a`)
+#   git aic -y              # commit without opening the editor
+#   git aic --amend         # regenerate the message for the amended commit
+#   git aic -p              # print the message only, do not commit
+#   git aic -- <args>       # anything else is passed through to `git commit`
+#
+# Env:
+#   GIT_AIC_MODEL           model alias/name (default: sonnet)
+#   GIT_AIC_MAX_DIFF        max diff bytes sent to Claude (default: 60000)
+
+set -euo pipefail
+
+model="${GIT_AIC_MODEL:-sonnet}"
+max_diff="${GIT_AIC_MAX_DIFF:-60000}"
+edit=1
+print_only=0
+all=0
+amend=0
+passthrough=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -y|--yes)     edit=0 ;;
+    -p|--print)   print_only=1 ;;
+    -a|--all)     all=1; passthrough+=("$1") ;;
+    --amend)      amend=1; passthrough+=("$1") ;;
+    -h|--help)    sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --)           shift; passthrough+=("$@"); break ;;
+    *)            passthrough+=("$1") ;;
+  esac
+  shift
+done
+
+git rev-parse --git-dir >/dev/null 2>&1 || { echo "git aic: not a git repository" >&2; exit 1; }
+command -v claude >/dev/null || { echo "git aic: claude CLI not found" >&2; exit 1; }
+
+# Diff that the commit will contain.
+if [[ $all -eq 1 ]]; then
+  base=HEAD; [[ $amend -eq 1 ]] && base=HEAD~1
+  diff_cmd=(git diff "$base")
+elif [[ $amend -eq 1 ]]; then
+  diff_cmd=(git diff --cached HEAD~1)
+else
+  diff_cmd=(git diff --cached)
+fi
+
+stat="$("${diff_cmd[@]}" --stat)"
+if [[ -z "$stat" ]]; then
+  echo "git aic: nothing to commit (stage changes or use -a)" >&2
+  exit 1
+fi
+
+diff="$("${diff_cmd[@]}" --no-color --no-ext-diff)"
+if (( ${#diff} > max_diff )); then
+  diff="${diff:0:max_diff}
+[... diff truncated at ${max_diff} bytes; rely on the stat above for the rest ...]"
+fi
+
+recent="$(git log -n 10 --format='%s' 2>/dev/null || true)"
+
+prompt="/commit-style Write the git commit message for the change below.
+
+Output ONLY the raw commit message: subject line, then an optional blank line
+and body. No code fences, no quotes, no preamble, no explanation, no trailers.
+
+Recent commit subjects in this repo (match their tone and conventions):
+${recent:-<none>}
+
+Diff stat:
+${stat}
+
+Diff:
+${diff}"
+
+echo "git aic: generating message with Claude ($model)..." >&2
+msg="$(
+  printf '%s' "$prompt" | claude -p \
+    --model "$model" \
+    --tools "" \
+    --strict-mcp-config \
+    --no-session-persistence \
+    --settings '{"disableAllHooks": true}' \
+    2>/dev/null
+)" || { echo "git aic: claude failed" >&2; exit 1; }
+
+# Strip stray code fences and leading/trailing blank lines.
+msg="$(printf '%s\n' "$msg" | sed '/^```/d' | sed -e '/./,$!d' | sed -e ':a' -e '/^\n*$/{$d;N;ba' -e '}')"
+[[ -n "$msg" ]] || { echo "git aic: empty message from claude" >&2; exit 1; }
+
+if [[ $print_only -eq 1 ]]; then
+  printf '%s\n' "$msg"
+  exit 0
+fi
+
+if [[ $edit -eq 1 ]]; then
+  exec git commit -e -m "$msg" "${passthrough[@]+"${passthrough[@]}"}"
+else
+  exec git commit -m "$msg" "${passthrough[@]+"${passthrough[@]}"}"
+fi
