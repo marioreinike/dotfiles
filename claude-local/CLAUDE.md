@@ -21,6 +21,14 @@ These apply to every Claude Code session, across all projects.
 - Whenever the `ui-verifier` agent finishes (or you run the `ui-preview` skill yourself), show me the generated screenshots in your reply as clickable markdown links with `file://` URLs, so I can open them from the session. Put the gallery (`index.html`) first, then one link per state, with defect states first and marked ⚠.
 - Relay the agent's "Screenshots" block verbatim. If it is missing, build the links yourself from the screenshot directory it reports (`ls` the dir). Never just say where the images are, and never drop this block for brevity.
 
+## PR Review Loop
+
+- Once you have opened a PR and it is ready for review (pushed, description written), ask me whether to launch the `pr-reviewer` agent on it. Never launch it without asking. Include a recommendation (launch or skip) with a short reason, based on the PR's size, risk, and the areas it touches.
+- Launch it in the background, pass the repo checkout path (or worktree) and the PR number. It is read-only: it returns a review and never posts comments.
+- When the reviewer finishes, do not apply or discard anything on your own. First verify each reported issue against the code yourself, then present the issues to me one by one (or grouped if they share a cause). For each issue state: what it is, whether you confirmed it, your recommendation (accept and fix, or discard), and the reason behind the recommendation.
+- Then ask me, per issue, to either accept it (you implement the fix) or discard it with a reason. A discard needs a reason. Propose one if I do not give it, and keep it in your summary.
+- Implement only the accepted fixes, push, and report what was fixed and what was discarded and why. Only post the reviewer's inline comments to the PR if I explicitly ask. Ask me again whether to re-run the reviewer after substantial fixes, again with a recommendation.
+
 ## Local Resource Limits
 
 Scope: applies only to the `backend` and `turborepo-frontend` repos, including any of their git worktrees (e.g. checkouts under `~/WORKSPACES/*`). Not a general rule for every project.
