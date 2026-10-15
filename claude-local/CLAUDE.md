@@ -25,7 +25,9 @@ These apply to every Claude Code session, across all projects.
 
 - Once you have opened a PR and it is ready for review (pushed, description written), ask me whether to launch the `pr-reviewer` agent on it. Never launch it without asking. Include a recommendation (launch or skip) with a short reason, based on the PR's size, risk, and the areas it touches.
 - Launch it in the background, pass the repo checkout path (or worktree) and the PR number. It is read-only: it returns a review and never posts comments.
-- When the reviewer finishes, do not apply or discard anything on your own. First verify each reported issue against the code yourself, then present the issues to me one by one (or grouped if they share a cause). For each issue state: what it is, whether you confirmed it, your recommendation (accept and fix, or discard), and the reason behind the recommendation.
+- When the reviewer finishes, first verify each reported issue against the code yourself.
+- Straightforward, evident fixes: do not prompt me, just fix them right away. An issue qualifies only if all hold: you confirmed it is real, the fix is obvious and local (typo, missing null check, dead code, wrong variable, clear convention violation), there is a single reasonable fix, and it changes no behavior, API, schema, or design. Report afterwards what you fixed, one line each.
+- For every other issue (ambiguous, design-level, behavior-changing, uncertain, or debatable), do not apply or discard on your own. Present them to me one by one (or grouped if they share a cause). For each state: what it is, whether you confirmed it, your recommendation (accept and fix, or discard), and the reason behind the recommendation.
 - Then ask me, per issue, to either accept it (you implement the fix) or discard it with a reason. A discard needs a reason. Propose one if I do not give it, and keep it in your summary.
 - Implement only the accepted fixes, push, and report what was fixed and what was discarded and why. Only post the reviewer's inline comments to the PR if I explicitly ask. Ask me again whether to re-run the reviewer after substantial fixes, again with a recommendation.
 
