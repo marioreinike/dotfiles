@@ -32,8 +32,12 @@ else
   MODEL_LABEL="$MODEL"
 fi
 TEXT="📁 ${DISPLAY_DIR} [$MODEL_LABEL] Context: $(fmt_tokens "$USED") / $(fmt_tokens "$TOTAL") (${PCT}%)"
-if [ "$USED" -ge 250000 ]; then
+if [ "$USED" -ge 650000 ]; then
   echo -e "\033[31m${TEXT}\033[0m"
+elif [ "$USED" -ge 500000 ]; then
+  echo -e "\033[33m${TEXT}\033[0m"
+elif [ "$USED" -ge 250000 ]; then
+  echo -e "\033[32m${TEXT}\033[0m"
 else
   echo "$TEXT"
 fi
