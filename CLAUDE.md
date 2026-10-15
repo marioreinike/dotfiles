@@ -122,6 +122,7 @@ So delta's appearance inside lazygit is controlled by the `[delta "lazygit"]` se
 
 **User-level agents** (backed up in `claude-local/agents/`, synced to `~/.claude/agents/`):
 - `ui-verifier` — Background subagent (Sonnet, medium effort — benchmarked: same findings as high at ~45% of the tokens; low misses some) that preloads the `ui-preview` skill: given a frontend checkout/worktree, base branch, targets and upload mode (auto|none|final), it writes scenarios, screenshots all relevant states, inspects them and returns a verdict with defects (severity, screenshot path, likely `file:line` cause, fix). Never edits product code, never runs typecheck/lint/build/test.
+- `pr-reviewer` — Background subagent (Opus, high effort) for correctness review of an existing PR. Given a repo checkout/worktree and PR number, it uses that repo's `.claude/commands/review-pr.md` (backend, turborepo-frontend, infra) as evaluation instructions, falling back to a generic review when absent. Read-only: never posts comments, never checks out branches in the checkout (fetches `pull/<n>/head`), never runs typecheck/lint/build/test. Returns verdict, issues, and ready-to-post inline comment bodies for the caller to post after approval.
 
 When Mario asks to create global skills, save them to both `~/.claude/skills/<name>/SKILL.md` and `claude-local/skills/<name>/SKILL.md`.
 
