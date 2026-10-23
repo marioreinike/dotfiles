@@ -71,5 +71,9 @@
     "headers": {
       "Authorization": "# REDACTED - set this manually"
     }
+  },
+  "drata-mcp-server": {
+    "type": "http",
+    "url": "https://mcp.drata.com/mcp/"
   }
 }
