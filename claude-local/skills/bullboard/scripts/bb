@@ -1,0 +1,138 @@
+#!/usr/bin/env bash
+# Read-only Bull Board client for Vambe prod.
+# Basic-auth creds come from 1Password once, then are cached as a curl config
+# (dir 0700, file 0600) for BB_TTL_MIN minutes so Touch ID isn't asked on every call.
+# Only GET is ever sent. Job payload values are hidden unless --data is passed.
+#
+# usage:
+#   bb instances
+#   bb health <instance>
+#   bb names <instance>
+#   bb queues <instance> [sort: failed|active|waiting|delayed|completed|name]
+#   bb jobs <instance> <queue> [status=failed] [n=5] [--data]
+#   bb job <instance> <queue> <jobId> [--data]
+#   bb concurrency <instance> [queue]
+#   bb purge
+set -euo pipefail
+
+TTL_MIN=${BB_TTL_MIN:-60}
+DIR="${TMPDIR:-/tmp}/bb-$(id -u)"
+CFG="$DIR/curlrc"
+HOST="https://api.vambe.ai/bull-board"
+INSTANCES="vambe ads corps apollo vibe-flow salesforce-bridge"
+STATUSES="active waiting waiting-children prioritized completed failed delayed paused latest"
+
+die() { echo "bb: $*" >&2; exit 2; }
+
+purge() { rm -rf "$DIR"; }
+
+fresh() { [ -s "$CFG" ] && [ -n "$(find "$CFG" -mmin "-$TTL_MIN" 2>/dev/null)" ]; }
+
+fetch_creds() {
+  umask 077
+  mkdir -p "$DIR"; chmod 700 "$DIR"
+  local json
+  json=$(op item get iarcua4dmn3ur52m35ceip5rfa --vault t55mxbkmcbpqhryz54z6agitai \
+    --account vambe.1password.com --fields username,password --reveal --format json) \
+    || { purge; die "1Password read failed (approve the prompt and retry)"; }
+  printf '%s' "$json" | jq -r '"user = \"\(.[0].value):\(.[1].value)\""' > "$CFG.tmp"
+  chmod 600 "$CFG.tmp"; mv "$CFG.tmp" "$CFG"
+}
+
+# api <instance> <path> [curl args]  — always GET, creds via -K file (never argv)
+api() {
+  local inst="$1" p="$2"; shift 2
+  fresh || fetch_creds
+  curl -sS --max-time 60 --fail-with-body -X GET -K "$CFG" "$@" "$HOST/$inst/$p"
+}
+
+check_instance() { [[ " $INSTANCES " == *" $1 "* ]] || die "unknown instance '$1' (one of: $INSTANCES)"; }
+check_name() { [[ "$1" =~ ^[A-Za-z0-9_.:-]+$ ]] || die "invalid name '$1'"; }
+
+cmd="${1:-}"; [ $# -gt 0 ] && shift
+SHOW_DATA=0
+args=()
+for a in "$@"; do [ "$a" = "--data" ] && SHOW_DATA=1 || args+=("$a"); done
+set -- ${args[@]+"${args[@]}"}
+
+# jq program: summarize one job; payload values only with --data
+JOB_JQ='
+  def keysof(d): if (d|type)=="object" then (d|keys) else (d|type) end;
+  {id, name, attempts, isFailed, delay, progress,
+   timestamp, processedOn, finishedOn,
+   failedReason: ((.failedReason // "")[:400]),
+   stacktrace0: ((.stacktrace // [])[0] // "" | .[:400]),
+   data_keys: keysof(.data),
+   returnValue_type: ((.returnValue)|type)}
+  + (if $data == 1 then {data, returnValue} else {} end)'
+
+case "$cmd" in
+  purge) purge ;;
+  instances) for i in $INSTANCES; do echo "$i"; done ;;
+  health) check_instance "${1:?instance}"; api "$1" health ;;
+  names) check_instance "${1:?instance}"; api "$1" discovered-queues | jq -r '.queues[]' ;;
+  queues)
+    check_instance "${1:?instance}"; sort="${2:-failed}"
+    case "$sort" in
+      name) sk='.name' ;;
+      failed|active|waiting|delayed|completed) sk="-(.c.$sort)" ;;
+      *) die "sort must be failed|active|waiting|delayed|completed|name" ;;
+    esac
+    api "$1" queues/api/queues | jq -r --arg s "$sort" "
+      [.queues[] | {name, c: .counts, paused: .isPaused, workers: .hasWorkers}]
+      | sort_by($sk)[]
+      | [.name, \"active=\(.c.active)\", \"waiting=\(.c.waiting)\", \"delayed=\(.c.delayed)\", \"failed=\(.c.failed)\", \"completed=\(.c.completed)\", (if .paused then \"PAUSED\" else \"\" end), (if .workers then \"\" else \"no-workers\" end)] | @tsv"
+    ;;
+  jobs)
+    check_instance "${1:?instance}"; q="${2:?queue}"; check_name "$q"
+    st="${3:-failed}"; n="${4:-5}"
+    [[ " $STATUSES " == *" $st "* ]] || die "status must be one of: $STATUSES"
+    [[ "$n" =~ ^[0-9]+$ ]] && [ "$n" -le 50 ] || die "n must be 1-50"
+    api "$1" queues/api/queues --get \
+      --data-urlencode "activeQueue=$q" --data-urlencode "status=$st" \
+      --data-urlencode "page=1" --data-urlencode "jobsPerPage=$n" \
+      | jq -c --arg q "$q" --argjson data "$SHOW_DATA" \
+        ".queues[] | select(.name==\$q) | .jobs[] | $JOB_JQ"
+    ;;
+  job)
+    check_instance "${1:?instance}"; q="${2:?queue}"; id="${3:?jobId}"
+    check_name "$q"; check_name "$id"
+    api "$1" "queues/api/queues/$q/$id" \
+      | jq --argjson data "$SHOW_DATA" "{status} + (.job | $JOB_JQ)"
+    ;;
+  concurrency)
+    check_instance "${1:?instance}"
+    if [ -n "${2:-}" ]; then check_name "$2"; api "$1" concurrency-admin/api/concurrencies | jq -c --arg q "$2" '.[]|select(.queue==$q)'
+    else api "$1" concurrency-admin/api/concurrencies | jq -c '.[]'; fi
+    ;;
+  where)
+    # Live lookup in the local checkout of the owning repo (read-only grep). No stored index.
+    check_instance "${1:?instance}"; q="${2:?queue}"; check_name "$q"
+    case "$1" in
+      vambe) repo=backend ;; ads) repo=ads-backend ;; corps) repo=vambeai-corps-v2 ;;
+      apollo) repo=apollo-chat ;; vibe-flow) repo=vambe-vibe-flow ;; salesforce-bridge) repo=salesforce-cdc-bridge ;;
+    esac
+    root="$HOME/REPOS/$repo"; [ -d "$root" ] || die "no checkout at $root"
+    echo "repo: $root (branch $(git -C "$root" branch --show-current))" >&2
+    gr() { grep -rnE --include='*.ts' --include='*.js' --include='*.py' --exclude-dir=node_modules \
+      --exclude-dir=dist --exclude-dir=.git --exclude-dir=test --exclude-dir=.next -- "$1" "$root" | sed "s#^$root/##" | cut -c1-200; }
+    echo "## definition (literal)"; defs=$(gr "['\"]$q['\"]"); echo "${defs:-none}"
+    # constant name is on the definition line or the line above (prettier wraps `= 'name'`)
+    const=""
+    first=$(printf '%s\n' "$defs" | head -1)
+    if [ -n "$first" ] && [ "$first" != none ]; then
+      f=${first%%:*}; rest=${first#*:}; n=${rest%%:*}
+      for ln in "$n" "$((n>1 ? n-1 : 1))"; do
+        const=$(sed -n "${ln}p" "$root/$f" | grep -oE "(const|let|var) +[A-Za-z0-9_]+|^ *[A-Za-z0-9_]+ *(:[^=]+)?= *['\"]?" | head -1 \
+          | sed -E 's/^(const|let|var) +//; s/^ +//; s/ *(:.*)?= *.*$//') || true
+        [ -n "$const" ] && break || true
+      done
+    fi
+    [ -z "$const" ] && [[ "$q" =~ ^[A-Z0-9_]+$ ]] && const="$q"
+    if [ -n "$const" ]; then
+      echo "## uses of $const: processors/workers"; gr "\b$const\b" | grep -E "@Processor|WorkerHost|new Worker|Processor\(" | head -10
+      echo "## uses of $const: producers"; gr "\b$const\b" | grep -E "InjectQueue|\.add\(|\.addBulk\(|new Queue|FlowProducer" | head -10
+    fi
+    ;;
+  *) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2 ;;
+esac
