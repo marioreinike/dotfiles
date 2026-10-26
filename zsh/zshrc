@@ -189,6 +189,25 @@ _ws() {
 }
 compdef _ws ws
 
+# Jump into a repo: `repo` lists them, `repo backend` → ~/REPOS/backend. Tab-completes.
+repo() {
+  local base=$HOME/REPOS
+  if (( $# == 0 )); then
+    print -l $base/*(/N:t)
+    return
+  fi
+  local target=$base/$1
+  [[ -d $target ]] || { print -u2 "repo: no such directory: $target"; return 1 }
+  cd $target
+}
+_repo() {
+  (( CURRENT == 2 )) || return
+  local -a dirs; dirs=($HOME/REPOS/*(/N:t))
+  # Prefix matches first; fall back to substring (`repo end` → backend, ads-backend)
+  compadd -- $dirs || compadd -M 'l:|=* r:|=*' -- $dirs
+}
+compdef _repo repo
+
 # Quick navigate to git worktree by branch name
 cdwt() { cd "$(git worktree list | grep "$1" | awk '{print $1}')" }
 
