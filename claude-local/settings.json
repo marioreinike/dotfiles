@@ -49,34 +49,7 @@
       "mcp__clickup__clickup_get_current_time_entry",
       "mcp__clickup__clickup_get_chat_channels",
       "mcp__clickup__clickup_list_document_pages",
-      "mcp__clickup__clickup_get_document_pages",
-      "mcp__playwright__browser_navigate",
-      "mcp__playwright__browser_go_back",
-      "mcp__playwright__browser_go_forward",
-      "mcp__playwright__browser_click",
-      "mcp__playwright__browser_hover",
-      "mcp__playwright__browser_drag",
-      "mcp__playwright__browser_type",
-      "mcp__playwright__browser_select_option",
-      "mcp__playwright__browser_snapshot",
-      "mcp__playwright__browser_take_screenshot",
-      "mcp__playwright__browser_pdf_save",
-      "mcp__playwright__browser_javascript_execute",
-      "mcp__playwright__browser_tab_list",
-      "mcp__playwright__browser_tab_new",
-      "mcp__playwright__browser_tab_close",
-      "mcp__playwright__browser_tab_select",
-      "mcp__playwright__browser_file_upload",
-      "mcp__playwright__browser_console_messages",
-      "mcp__playwright__browser_close",
-      "mcp__playwright__browser_resize",
-      "mcp__playwright__browser_handle_dialog",
-      "mcp__playwright__browser_press_key",
-      "mcp__playwright__browser_wait",
-      "mcp__playwright__browser_mouse_move",
-      "mcp__playwright__browser_mouse_click",
-      "mcp__playwright__browser_mouse_drag",
-      "mcp__playwright__browser_mouse_scroll"
+      "mcp__clickup__clickup_get_document_pages"
     ],
     "defaultMode": "auto"
   },
@@ -154,7 +127,6 @@
     "command": "~/.claude/statusline.sh"
   },
   "enabledPlugins": {
-    "chrome-devtools-mcp@claude-plugins-official": true,
     "slack@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {

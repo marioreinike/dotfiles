@@ -237,9 +237,6 @@ alias clb="claude --dangerously-skip-permissions"
 alias cld="cd ~/REPOS/dotfiles && claude --dangerously-skip-permissions"
 alias dotfiles="cd ~/REPOS/dotfiles"
 
-# Launch Chrome with remote-debugging-port so the Playwright MCP can attach via CDP.
-alias chrome-debug="/Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome --remote-debugging-port=9222"
-
 # Save the last command AND its output per tmux pane, for the "prefix + O"
 # tmux binding. No marker text is ever printed into the pane (an earlier
 # version tried an "invisible" zero-width-char marker — terminals drop

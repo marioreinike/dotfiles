@@ -1,16 +1,6 @@
 {
   "version": 2,
   "plugins": {
-    "chrome-devtools-mcp@claude-plugins-official": [
-      {
-        "scope": "user",
-        "installPath": "/Users/mario/.claude/plugins/cache/claude-plugins-official/chrome-devtools-mcp/1.7.0",
-        "version": "1.7.0",
-        "installedAt": "2026-06-15T22:00:47.075Z",
-        "lastUpdated": "2026-08-10T19:30:15.282Z",
-        "gitCommitSha": "ed02047ae90f25c4c15adb8fd7e224b963f43135"
-      }
-    ],
     "slack@claude-plugins-official": [
       {
         "scope": "user",
