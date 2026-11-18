@@ -61,11 +61,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.local/bin/claude-notify",
-            "timeout": 5000
-          },
-          {
-            "type": "command",
             "command": "~/.local/bin/claude-state-hook",
             "timeout": 5000
           }

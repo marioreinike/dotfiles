@@ -54,7 +54,6 @@ applock/          → Port-lease manager so competing agents don't collide runni
 | `tmux/tmux-cheatsheet` | `~/.config/tmux/tmux-cheatsheet` |
 | `tmux/tmux-pane-manager.sh` | `~/.config/tmux/tmux-pane-manager.sh` |
 | `agent-monitor/claude-dashboard` | `~/.local/bin/claude-dashboard` |
-| `agent-monitor/claude-notify` | `~/.local/bin/claude-notify` |
 | `agent-monitor/claude-state-hook` | `~/.local/bin/claude-state-hook` |
 | `applock/applock` | `~/.local/bin/applock` |
 | `applock/services.example.json` | (seeds `~/.applock/services.json` on first use; runtime state under `~/.applock/` is NOT tracked) |
