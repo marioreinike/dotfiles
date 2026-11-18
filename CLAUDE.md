@@ -53,6 +53,7 @@ applock/          → Port-lease manager so competing agents don't collide runni
 | `tmux/tmux.conf` | `~/.config/tmux/tmux.conf` |
 | `tmux/tmux-cheatsheet` | `~/.config/tmux/tmux-cheatsheet` |
 | `tmux/tmux-pane-manager.sh` | `~/.config/tmux/tmux-pane-manager.sh` |
+| `tmux/tmux-stat.sh` | `~/.config/tmux/tmux-stat.sh` (fixed-width CPU/RAM for status-right) |
 | `agent-monitor/claude-dashboard` | `~/.local/bin/claude-dashboard` |
 | `agent-monitor/claude-state-hook` | `~/.local/bin/claude-state-hook` |
 | `applock/applock` | `~/.local/bin/applock` |
