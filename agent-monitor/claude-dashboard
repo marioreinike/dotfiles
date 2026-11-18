@@ -564,7 +564,7 @@ detect_transitions() {
 
   local now_time
   now_time=$(date +%H:%M:%S)
-  local bell=0 changed=0
+  local changed=0
   local i=0
   while [ "$i" -lt "$AGENT_COUNT" ]; do
     local tty="${A_TTY[$i]}"
@@ -587,7 +587,6 @@ detect_transitions() {
       if [ "$prev_state" != "$new_state" ]; then
         EVENT_LOG+=("${now_time} ${sess}/${win}: ${prev_state} → ${new_state}")
         changed=1
-        [ "$new_state" = "waiting" ] && bell=1
         [ "$new_state" = "idle" ] && add_notification "$tty"
         [ "$prev_state" = "idle" ] && remove_notification "$tty"
       elif [ "$new_mtime" != "$prev_mtime" ] && [ "$new_mtime" != "0" ]; then
@@ -618,8 +617,6 @@ detect_transitions() {
 
   # Persist event log if changed
   [ "$changed" -eq 1 ] && save_event_log
-
-  [ "$bell" -eq 1 ] && printf '\a'
 }
 
 # Clear notifications for agents whose pane is currently visible in tmux
