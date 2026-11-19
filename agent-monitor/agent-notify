@@ -214,11 +214,18 @@ def main():
     if pane:
         args += ["-execute", f"{shlex.quote(FOCUS)} {shlex.quote(pane)}"]
     # Mark the notification as pending so claude-state-hook can retract it
-    # once you act on the agent from the terminal (UserPromptSubmit after
-    # "terminó", PostToolUse or UserPromptSubmit after a waiting one).
+    # once you act on the agent from the terminal. The marker says what kind
+    # it is: "done" is retracted only by your next prompt (UserPromptSubmit),
+    # because background tasks and subagents keep firing PostToolUse after
+    # Stop; "waiting <tool>" is also retracted by the PostToolUse of that
+    # same tool, which means you approved it.
     if marker:
         os.makedirs(PENDING_DIR, exist_ok=True)
-        open(marker, "w").close()
+        with open(marker, "w") as f:
+            if event == "Stop":
+                f.write("done\n")
+            else:
+                f.write(f"waiting {data.get('tool_name') or ''}\n")
     run(args)
 
 
