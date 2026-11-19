@@ -26,7 +26,7 @@ zed/              → Zed editor settings and keymap (~/.config/zed/)
 nvim/             → Neovim config with NvChad (~/.config/nvim/lua/ and .stylua.toml)
 tmux/             → Tmux terminal multiplexer config (~/.config/tmux/)
 nano/             → Nano editor config (~/.nanorc)
-agent-monitor/    → Claude Code agent dashboard scripts (~/.local/bin/)
+agent-monitor/    → Claude Code agent dashboard and notification scripts (~/.local/bin/)
 applock/          → Port-lease manager so competing agents don't collide running apps (~/.local/bin/applock)
 ```
 
@@ -56,6 +56,8 @@ applock/          → Port-lease manager so competing agents don't collide runni
 | `tmux/tmux-stat.sh` | `~/.config/tmux/tmux-stat.sh` (fixed-width CPU/RAM for status-right) |
 | `agent-monitor/claude-dashboard` | `~/.local/bin/claude-dashboard` |
 | `agent-monitor/claude-state-hook` | `~/.local/bin/claude-state-hook` |
+| `agent-monitor/agent-notify` | `~/.local/bin/agent-notify` (Stop/PermissionRequest hook: macOS notification via `terminal-notifier` with a message preview; skipped while you are looking at the agent's pane) |
+| `agent-monitor/agent-focus` | `~/.local/bin/agent-focus` (notification click handler: jumps the tmux client to the agent's pane) |
 | `applock/applock` | `~/.local/bin/applock` |
 | `applock/services.example.json` | (seeds `~/.applock/services.json` on first use; runtime state under `~/.applock/` is NOT tracked) |
 | `claude-local/CLAUDE.md` | `~/.claude/CLAUDE.md` |

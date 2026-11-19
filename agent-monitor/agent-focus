@@ -1,0 +1,20 @@
+#!/bin/bash
+# Click handler for agent-notify notifications: switch the most recently used
+# tmux client to the agent's pane.
+# Usage: agent-focus <pane_id>   (e.g. %142)
+# terminal-notifier runs this with a minimal PATH, so tmux is called by its
+# absolute path.
+
+TMUX_BIN=/opt/homebrew/bin/tmux
+pane="$1"
+[ -n "$pane" ] || exit 0
+
+# The pane may be gone by the time the notification is clicked.
+"$TMUX_BIN" display-message -p -t "$pane" '' >/dev/null 2>&1 || exit 0
+
+client=$("$TMUX_BIN" list-clients -F '#{client_activity} #{client_name}' | sort -rn | head -1 | cut -d' ' -f2-)
+[ -n "$client" ] || exit 0
+
+"$TMUX_BIN" switch-client -c "$client" -t "$pane"
+"$TMUX_BIN" select-window -t "$pane"
+"$TMUX_BIN" select-pane -t "$pane"

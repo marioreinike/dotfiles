@@ -1,0 +1,194 @@
+#!/usr/bin/env python3
+"""Agent notification hook for Claude Code and Codex.
+
+Usage (as a hook command): agent-notify claude|codex   (hook JSON on stdin)
+
+Sends a macOS notification through terminal-notifier when an agent:
+  - finishes its turn (Stop): body is a preview of its last message.
+  - asks for permission (PermissionRequest): body is a preview of what it
+    wants to run.
+
+The notification is skipped when you are already looking at the agent:
+the terminal app is frontmost AND the agent's pane is the active pane of the
+active window in the session your tmux client is showing.
+
+Clicking the notification brings the terminal to the front and jumps tmux to
+the agent's pane (via agent-focus). No sound is played.
+"""
+
+import json
+import os
+import re
+import shlex
+import subprocess
+import sys
+
+TMUX = "/opt/homebrew/bin/tmux"
+NOTIFIER = "/opt/homebrew/bin/terminal-notifier"
+FOCUS = os.path.expanduser("~/.local/bin/agent-focus")
+TERMINAL_BUNDLE = "com.googlecode.iterm2"
+PREVIEW_LEN = 180
+AGENT_NAMES = {"claude": "Claude", "codex": "Codex"}
+
+
+def run(args):
+    try:
+        return subprocess.run(args, capture_output=True, text=True, timeout=3).stdout
+    except Exception:
+        return ""
+
+
+def find_pane():
+    """Return the tmux pane id (%N) the agent runs in, or None."""
+    pane = os.environ.get("TMUX_PANE")
+    if pane:
+        return pane
+    # Fallback when TMUX_PANE is not inherited: walk up the parent processes
+    # to find the agent's TTY (hooks have no controlling terminal), then map
+    # that TTY to a tmux pane.
+    tty = None
+    pid = os.getppid()
+    for _ in range(6):
+        if not pid or pid == 1:
+            break
+        t = run(["ps", "-o", "tty=", "-p", str(pid)]).strip()
+        if t and t not in ("?", "??"):
+            tty = "/dev/" + t
+            break
+        ppid = run(["ps", "-o", "ppid=", "-p", str(pid)]).strip()
+        pid = int(ppid) if ppid.isdigit() else None
+    if not tty:
+        return None
+    for line in run([TMUX, "list-panes", "-a", "-F", "#{pane_tty} #{pane_id}"]).splitlines():
+        parts = line.split()
+        if len(parts) == 2 and parts[0] == tty:
+            return parts[1]
+    return None
+
+
+def pane_info(pane):
+    fmt = "#{session_name}\t#{window_index}\t#{window_name}\t#{pane_active}\t#{window_active}"
+    out = run([TMUX, "display-message", "-p", "-t", pane, fmt]).rstrip("\n")
+    parts = out.split("\t")
+    if len(parts) != 5:
+        return None
+    return {
+        "session": parts[0],
+        "window_index": parts[1],
+        "window_name": parts[2],
+        "pane_active": parts[3] == "1",
+        "window_active": parts[4] == "1",
+    }
+
+
+def terminal_is_frontmost():
+    front = run(["lsappinfo", "front"]).strip()
+    if not front:
+        return False
+    return TERMINAL_BUNDLE in run(["lsappinfo", "info", "-only", "bundleid", front])
+
+
+def current_client_session():
+    """Session shown by the most recently used tmux client."""
+    best = None
+    for line in run([TMUX, "list-clients", "-F", "#{client_activity}\t#{client_session}"]).splitlines():
+        activity, _, session = line.partition("\t")
+        if activity.isdigit() and (best is None or int(activity) > best[0]):
+            best = (int(activity), session)
+    return best[1] if best else None
+
+
+def is_watching(info):
+    if not info or not (info["pane_active"] and info["window_active"]):
+        return False
+    if info["session"] != current_client_session():
+        return False
+    return terminal_is_frontmost()
+
+
+def clean(text):
+    """Flatten markdown into a single short line for the notification body."""
+    text = re.sub(r"```.*?```", " [code] ", text, flags=re.S)
+    text = re.sub(r"`([^`]*)`", r"\1", text)
+    text = text.replace("**", "")
+    text = re.sub(r"^#+\s*|^\s*[-*]\s+|\|", " ", text, flags=re.M)
+    text = re.sub(r"\s+", " ", text).strip()
+    if len(text) > PREVIEW_LEN:
+        text = text[: PREVIEW_LEN - 1].rstrip() + "…"
+    return text
+
+
+def tool_preview(name, tool_input):
+    if not isinstance(tool_input, dict):
+        tool_input = {}
+    for key in ("command", "file_path", "path", "url", "pattern", "query"):
+        value = tool_input.get(key)
+        if isinstance(value, str) and value.strip():
+            # apply_patch sends the whole patch as "command": keep its first line.
+            if name == "apply_patch":
+                value = value.strip().splitlines()[0]
+            return f"{name}: {value}"
+    if name.startswith("mcp__"):
+        name = name[5:].replace("__", ": ", 1)
+    if tool_input:
+        return f"{name}: {json.dumps(tool_input, ensure_ascii=False)}"
+    return name
+
+
+def escape(text):
+    # terminal-notifier treats a value starting with "-" or "[" specially.
+    return "\\" + text if text[:1] in ("-", "[") else text
+
+
+def main():
+    agent = AGENT_NAMES.get(sys.argv[1] if len(sys.argv) > 1 else "", "Agent")
+    try:
+        data = json.loads(sys.stdin.read() or "{}")
+    except Exception:
+        return
+
+    event = data.get("hook_event_name", "")
+    if event == "Stop":
+        title = f"{agent} terminó"
+        body = clean(data.get("last_assistant_message") or "") or "(sin mensaje)"
+    elif event == "PermissionRequest" and data.get("tool_name") == "AskUserQuestion":
+        questions = (data.get("tool_input") or {}).get("questions") or [{}]
+        title = f"{agent} te hace una pregunta"
+        body = clean(questions[0].get("question") or "") or "(sin texto)"
+    elif event == "PermissionRequest":
+        title = f"{agent} espera permiso"
+        body = clean(tool_preview(data.get("tool_name") or "tool", data.get("tool_input")))
+    else:
+        return
+
+    pane = find_pane()
+    info = pane_info(pane) if pane else None
+    if is_watching(info):
+        return
+
+    if info:
+        subtitle = f"{info['session']}:{info['window_index']} {info['window_name']}"
+    else:
+        subtitle = os.path.basename(data.get("cwd") or os.getcwd())
+
+    args = [
+        NOTIFIER,
+        "-title", escape(title),
+        "-subtitle", escape(subtitle),
+        "-message", escape(body),
+        "-group", f"agent-{data.get('session_id') or pane or 'unknown'}",
+        "-activate", TERMINAL_BUNDLE,
+        # Best effort: ask macOS to show it even while a Focus mode is on.
+        "-ignoreDnD",
+    ]
+    if pane:
+        args += ["-execute", f"{shlex.quote(FOCUS)} {shlex.quote(pane)}"]
+    run(args)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception:
+        pass
+    sys.exit(0)
