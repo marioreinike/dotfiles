@@ -21,7 +21,8 @@ event=$(json_str hook_event_name)
 case "$event" in
   UserPromptSubmit|PostToolUse)
     state="thinking"
-    # You answered: retract the pending agent-notify "needs you" notification.
+    # You answered: retract the pending agent-notify notification ("terminó"
+    # or waiting).
     # Synchronous on purpose, so it can't race a new notification that reuses
     # the same group right after.
     pending="/tmp/agent-notify/$session_id"
