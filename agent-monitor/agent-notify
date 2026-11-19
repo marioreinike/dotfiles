@@ -210,8 +210,6 @@ def main():
         "-group", group,
         "-activate", TERMINAL_BUNDLE,
         "-sound", sound,
-        # Best effort: ask macOS to show it even while a Focus mode is on.
-        "-ignoreDnD",
     ]
     if pane:
         args += ["-execute", f"{shlex.quote(FOCUS)} {shlex.quote(pane)}"]
