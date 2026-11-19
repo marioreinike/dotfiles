@@ -99,7 +99,7 @@ So delta's appearance inside lazygit is controlled by the `[delta "lazygit"]` se
 
 ## Agent Notifications (agent-notify)
 
-Claude Code's `Stop` and `PermissionRequest` hooks run `~/.local/bin/agent-notify claude`, which sends a macOS notification through `terminal-notifier`: "terminó" with a preview of the last message (sound `Morse`), or "espera permiso" / "te hace una pregunta" with the tool call or question (sound `Sosumi`). Nothing is sent while iTerm2 is frontmost and the agent's pane is the active one. Clicking a notification runs `agent-focus`, which jumps the tmux client to the agent's pane. A notification is retracted by `claude-state-hook` once you answer the agent from the terminal (next prompt, or the tool running after a permission). tmux itself makes no sounds (`activity-action none`, `monitor-bell off`).
+Claude Code's `Stop` and `PermissionRequest` hooks run `~/.local/bin/agent-notify claude`, which sends a macOS notification through `terminal-notifier`: "terminó" with a preview of the last message (sound `Morse`), or "espera permiso" / "te hace una pregunta" with the tool call or question (sound `Sosumi`). Nothing is sent while iTerm2 is frontmost and the agent's pane is the active one. Clicking a notification runs `agent-focus`, which jumps the tmux client to the agent's pane. `agent-notify` tags the agent's pane with the tmux option `@agent_notify`, and tmux's `pane-focus-in` and `client-focus-in` hooks (in `tmux.conf`, with `focus-events on`) retract the notification when you enter that pane or bring iTerm2 to the front while it is the active pane. tmux itself makes no sounds (`activity-action none`, `monitor-bell off`).
 
 Setup on a new computer:
 1. `brew install terminal-notifier`

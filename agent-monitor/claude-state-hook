@@ -21,22 +21,6 @@ event=$(json_str hook_event_name)
 case "$event" in
   UserPromptSubmit|PostToolUse)
     state="thinking"
-    # Retract the pending agent-notify notification once you answered:
-    #   - any notification: on your next prompt (UserPromptSubmit).
-    #   - "waiting <tool>": also on the PostToolUse of that same tool (you
-    #     approved it). A "done" one is never retracted by PostToolUse, since
-    #     background tasks and subagents keep firing it after Stop.
-    # Synchronous on purpose, so it can't race a new notification that reuses
-    # the same group right after.
-    pending="/tmp/agent-notify/$session_id"
-    if [ -f "$pending" ]; then
-      read -r kind tool < "$pending"
-      if [ "$event" = "UserPromptSubmit" ] \
-        || { [ "$kind" = "waiting" ] && [ -n "$tool" ] && [ "$(json_str tool_name)" = "$tool" ]; }; then
-        rm -f "$pending"
-        /opt/homebrew/bin/terminal-notifier -remove "agent-$session_id" >/dev/null 2>&1
-      fi
-    fi
     ;;
   Stop)
     state="idle"
