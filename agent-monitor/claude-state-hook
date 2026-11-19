@@ -21,6 +21,14 @@ event=$(json_str hook_event_name)
 case "$event" in
   UserPromptSubmit|PostToolUse)
     state="thinking"
+    # You answered: retract the pending agent-notify "needs you" notification.
+    # Synchronous on purpose, so it can't race a new notification that reuses
+    # the same group right after.
+    pending="/tmp/agent-notify/$session_id"
+    if [ -f "$pending" ]; then
+      rm -f "$pending"
+      /opt/homebrew/bin/terminal-notifier -remove "agent-$session_id" >/dev/null 2>&1
+    fi
     ;;
   Stop)
     state="idle"

@@ -15,6 +15,10 @@ active window in the session your tmux client is showing.
 Clicking the notification brings the terminal to the front and jumps tmux to
 the agent's pane (via agent-focus). Sounds: SOUND_DONE when it finishes,
 SOUND_NEEDS_YOU when it waits for you.
+
+A "needs you" notification is retracted once you answer from the terminal:
+this script leaves a marker in PENDING_DIR and claude-state-hook removes the
+notification on the next PostToolUse or UserPromptSubmit.
 """
 
 import json
@@ -35,6 +39,9 @@ AGENT_NAMES = {"claude": "Claude", "codex": "Codex"}
 # notifications" setting can silence them.
 SOUND_DONE = "Morse"
 SOUND_NEEDS_YOU = "Sosumi"
+# One empty file per session with a "needs you" notification on screen.
+# Shared with claude-state-hook, which retracts the notification.
+PENDING_DIR = "/tmp/agent-notify"
 
 
 def run(args):
@@ -170,9 +177,24 @@ def main():
     else:
         return
 
+    session_id = data.get("session_id") or ""
+    marker = os.path.join(PENDING_DIR, session_id) if session_id else None
+    group = f"agent-{session_id or 'unknown'}"
+    # On Stop the "needs you" notification is stale: the "terminó" one below
+    # replaces it (same group), or it is removed if you are watching.
+    had_pending = False
+    if marker and event == "Stop":
+        try:
+            os.remove(marker)
+            had_pending = True
+        except OSError:
+            pass
+
     pane = find_pane()
     info = pane_info(pane) if pane else None
     if is_watching(info):
+        if had_pending:
+            run([NOTIFIER, "-remove", group])
         return
 
     if info:
@@ -185,7 +207,7 @@ def main():
         "-title", escape(title),
         "-subtitle", escape(subtitle),
         "-message", escape(body),
-        "-group", f"agent-{data.get('session_id') or pane or 'unknown'}",
+        "-group", group,
         "-activate", TERMINAL_BUNDLE,
         "-sound", sound,
         # Best effort: ask macOS to show it even while a Focus mode is on.
@@ -193,6 +215,12 @@ def main():
     ]
     if pane:
         args += ["-execute", f"{shlex.quote(FOCUS)} {shlex.quote(pane)}"]
+    # Mark a "needs you" notification as pending so claude-state-hook can
+    # retract it once you answer from the terminal (PostToolUse or
+    # UserPromptSubmit).
+    if marker and sound == SOUND_NEEDS_YOU:
+        os.makedirs(PENDING_DIR, exist_ok=True)
+        open(marker, "w").close()
     run(args)
 
 
