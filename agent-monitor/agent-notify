@@ -13,7 +13,8 @@ the terminal app is frontmost AND the agent's pane is the active pane of the
 active window in the session your tmux client is showing.
 
 Clicking the notification brings the terminal to the front and jumps tmux to
-the agent's pane (via agent-focus). No sound is played.
+the agent's pane (via agent-focus). Sounds: SOUND_DONE when it finishes,
+SOUND_NEEDS_YOU when it waits for you.
 """
 
 import json
@@ -29,6 +30,11 @@ FOCUS = os.path.expanduser("~/.local/bin/agent-focus")
 TERMINAL_BUNDLE = "com.googlecode.iterm2"
 PREVIEW_LEN = 180
 AGENT_NAMES = {"claude": "Claude", "codex": "Codex"}
+# Notification sounds (names from /System/Library/Sounds). They play through
+# the notification itself, so Focus modes and the per-app "Play sound for
+# notifications" setting can silence them.
+SOUND_DONE = "Morse"
+SOUND_NEEDS_YOU = "Sosumi"
 
 
 def run(args):
@@ -151,13 +157,16 @@ def main():
     if event == "Stop":
         title = f"{agent} terminó"
         body = clean(data.get("last_assistant_message") or "") or "(sin mensaje)"
+        sound = SOUND_DONE
     elif event == "PermissionRequest" and data.get("tool_name") == "AskUserQuestion":
         questions = (data.get("tool_input") or {}).get("questions") or [{}]
         title = f"{agent} te hace una pregunta"
         body = clean(questions[0].get("question") or "") or "(sin texto)"
+        sound = SOUND_NEEDS_YOU
     elif event == "PermissionRequest":
         title = f"{agent} espera permiso"
         body = clean(tool_preview(data.get("tool_name") or "tool", data.get("tool_input")))
+        sound = SOUND_NEEDS_YOU
     else:
         return
 
@@ -178,6 +187,7 @@ def main():
         "-message", escape(body),
         "-group", f"agent-{data.get('session_id') or pane or 'unknown'}",
         "-activate", TERMINAL_BUNDLE,
+        "-sound", sound,
         # Best effort: ask macOS to show it even while a Focus mode is on.
         "-ignoreDnD",
     ]
