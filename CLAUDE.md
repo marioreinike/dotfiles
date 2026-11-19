@@ -97,6 +97,15 @@ Two linked tools handle git diffs; their configs live in two different files:
 
 So delta's appearance inside lazygit is controlled by the `[delta "lazygit"]` section in `git/gitconfig`, not by the lazygit config. Lazygit's `state.yml` (sibling of `config.yml`) is runtime state and is intentionally NOT tracked.
 
+## Agent Notifications (agent-notify)
+
+Claude Code's `Stop` and `PermissionRequest` hooks run `~/.local/bin/agent-notify claude`, which sends a macOS notification through `terminal-notifier`: "terminó" with a preview of the last message (sound `Morse`), or "espera permiso" / "te hace una pregunta" with the tool call or question (sound `Sosumi`). Nothing is sent while iTerm2 is frontmost and the agent's pane is the active one. Clicking a notification runs `agent-focus`, which jumps the tmux client to the agent's pane. A waiting notification is retracted by `claude-state-hook` once you answer. tmux itself makes no sounds (`activity-action none`, `monitor-bell off`).
+
+Setup on a new computer:
+1. `brew install terminal-notifier`
+2. Run `terminal-notifier -title test -message test` once so macOS registers the app, then allow it under System Settings → Notifications → terminal-notifier (Banners or Alerts, sound on).
+3. Focus modes block it (including its sound). Add terminal-notifier to Allowed Notifications → Apps in each Focus that should still show agent notifications.
+
 ## Key Shell Aliases
 
 - `lg` → lazygit, `lgs` → lazygit with delta side-by-side
