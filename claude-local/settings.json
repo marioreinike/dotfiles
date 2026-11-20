@@ -176,7 +176,8 @@
   "autoMode": {
     "allow": [
       "$defaults",
-      "Bash(vercel:*) in ~/REPOS/turborepo-frontend for routine deploy-status/inspect operations (27× usage, no denials recorded against it)"
+      "Bash(vercel:*) in ~/REPOS/turborepo-frontend for routine deploy-status/inspect operations (27× usage, no denials recorded against it)",
+      "Feature Branch Force Push: In any of the user's repos (including git worktrees), force-pushing (`git push --force`, `-f`, `--force-with-lease`, `--force-if-includes`, or a `+branch` refspec) to a branch other than main, master, dev, develop, staging, production/prod-*, release-*/release/*, or the repo's default branch is routine and user-intended — feature branches are the user's own, typically rewritten after a rebase or amend. Allow it without requiring the user to name the push or prove the commits are the agent's. This overrides the Git Destructive presumption only for those non-protected branches; force-pushes or remote deletions on the protected branches listed above are still judged by Git Destructive, and the pushed content is still judged by every content rule (Credential Leakage, etc.)."
     ],
     "soft_deny": [
       "$defaults",
