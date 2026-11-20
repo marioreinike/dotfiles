@@ -182,10 +182,14 @@ ws() {
   cd $target
 }
 _ws() {
+  local -a dirs
   case $CURRENT in
-    2) compadd -- $HOME/WORKSPACES/ws*(/N:t:s/ws/) ;;
-    3) compadd -- $HOME/WORKSPACES/ws${words[2]#ws}/*(/N:t) ;;
+    2) dirs=($HOME/WORKSPACES/ws*(/N:t:s/ws/)) ;;
+    3) dirs=($HOME/WORKSPACES/ws${words[2]#ws}/*(/N:t)) ;;
+    *) return ;;
   esac
+  # Prefix matches first; fall back to substring (`ws 5 end` → backend)
+  compadd -- $dirs || compadd -M 'l:|=* r:|=*' -- $dirs
 }
 compdef _ws ws
 
@@ -225,7 +229,20 @@ tmux-run() {
 }
 
 # Per-workspace repo freeness snapshot (branch/base/ahead/behind/tree)
+# `repostatus` = all workspaces; `repostatus ws3` / `repostatus 3` / `repostatus .` = one. Tab-completes.
 alias repostatus="$HOME/.claude/skills/repo-status/scripts/repo-status.sh"
+_repostatus() {
+  local -a flags; flags=(-f --fetch --no-tmux -h --help)
+  if [[ $PREFIX == -* ]]; then
+    compadd -- $flags
+  elif (( CURRENT == 2 )); then
+    local -a dirs; dirs=($HOME/WORKSPACES/ws*(/N:t))
+    # Prefix matches first; fall back to substring (`repostatus 3` → ws3)
+    compadd -- . $dirs || compadd -M 'l:|=* r:|=*' -- $dirs
+  fi
+}
+compdef _repostatus repo-status.sh
+compdef _repostatus repostatus
 
 # Merge a workspace's nested repos' .claude/{skills,commands,agents} into the
 # workspace root, so a Claude session started there can see them. No arg syncs

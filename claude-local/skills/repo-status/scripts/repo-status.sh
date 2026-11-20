@@ -38,7 +38,10 @@ usage() {
 repo-status.sh — per-workspace freeness snapshot: one table per workspace, one row
 per repo in it (branch, base, ahead, behind, tree). Wraps dispatch's ws-scan.sh.
 
-Usage: repo-status.sh [flags]
+Usage: repo-status.sh [workspace] [flags]
+
+Workspace (optional, first positional): ws3 | 3 | . (workspace containing the
+current directory) | any path inside a workspace. Omitted = all workspaces.
 
 Workspace verdicts:
   FREE     every repo clean and fully merged, no tmux session open
@@ -62,9 +65,43 @@ EOF
 
 scan_args=()
 USE_TMUX=1
+WS_FILTER=""
+WS_ROOT="${DISPATCH_WORKSPACES:-$HOME/WORKSPACES}"
+
+# Resolve the optional workspace argument to a workspace name (e.g. ws3).
+# Accepts: ws3 | 3 | . (workspace containing $PWD) | any path inside a workspace.
+resolve_ws() {
+  local a="$1" p root name
+  root="$(cd "$WS_ROOT" 2>/dev/null && pwd -P)" || { echo "error: workspaces root not found: $WS_ROOT" >&2; return 1; }
+  if [ -d "$WS_ROOT/ws${a#ws}" ] && [[ "$a" =~ ^(ws)?[0-9]+$ ]]; then
+    echo "ws${a#ws}"; return 0
+  fi
+  if [ -d "$a" ]; then
+    p="$(cd "$a" && pwd -P)"
+    case "$p/" in
+      "$root"/*/) name="${p#"$root"/}"; echo "${name%%/*}"; return 0 ;;
+    esac
+    echo "error: '$a' is not inside $WS_ROOT" >&2; return 1
+  fi
+  echo "error: no such workspace: $a" >&2; return 1
+}
+
 for arg in "$@"; do
   case "$arg" in
     -h|--help) usage; exit 0 ;;
+    -*) ;;   # flags handled below
+    *)
+      if [ -n "$WS_FILTER" ]; then
+        echo "error: only one workspace argument allowed (got '$WS_FILTER' and '$arg')" >&2; exit 2
+      fi
+      WS_FILTER="$(resolve_ws "$arg")" || exit 2 ;;
+  esac
+done
+
+for arg in "$@"; do
+  case "$arg" in
+    -h|--help) usage; exit 0 ;;
+    [!-]*) ;;   # positional workspace arg, already resolved above
     --no-tmux) USE_TMUX=0 ;;   # handled here, not a ws-scan.sh flag
     --free)
       echo "error: --free is incompatible with repo-status.sh (it needs ws-scan.sh's --report format)" >&2
@@ -74,6 +111,15 @@ for arg in "$@"; do
   esac
 done
 scan_args+=(--report)
+
+# Single workspace: scan a temp root holding just a symlink to it (fast, no
+# filtering of other workspaces' output needed).
+if [ -n "$WS_FILTER" ]; then
+  filter_root="$(mktemp -d "${TMPDIR:-/tmp}/repo-status.XXXXXX")"
+  trap 'rm -rf "$filter_root"' EXIT
+  ln -s "$WS_ROOT/$WS_FILTER" "$filter_root/$WS_FILTER"
+  export DISPATCH_WORKSPACES="$filter_root"
+fi
 
 raw="$("$DISPATCH_SCAN" "${scan_args[@]}")" || exit $?
 

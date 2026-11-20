@@ -1,7 +1,7 @@
 ---
 name: repo-status
 description: Per-workspace freeness snapshot across all dispatch workspaces (~/WORKSPACES). Shows, per workspace, every repo alias in it with branch, base, commits ahead/behind, and working-tree cleanliness, plus whether a live tmux session is open in it — so you can scan at a glance which workspaces/repos are free to use. Use when asked for a workspace/repo status snapshot, freeness overview, or "which repos are free" across workspaces. Keywords - repo status, workspace snapshot, freeness, which repos are free, repo overview, worktree status, claimed workspace, active session.
-argument-hint: [-f|--fetch] [--no-tmux]
+argument-hint: [ws3|3|.] [-f|--fetch] [--no-tmux]
 allowed-tools: Bash
 ---
 
@@ -17,7 +17,11 @@ It wraps dispatch's `ws-scan.sh` (same `repos.conf` / workspaces root, same free
 "${CLAUDE_SKILL_DIR}/scripts/repo-status.sh"            # offline (default)
 "${CLAUDE_SKILL_DIR}/scripts/repo-status.sh" --fetch    # fetch origin first, then report
 "${CLAUDE_SKILL_DIR}/scripts/repo-status.sh" --no-tmux  # git state only, ignore tmux sessions
+"${CLAUDE_SKILL_DIR}/scripts/repo-status.sh" ws3        # only workspace ws3 (also: 3, or a path)
+"${CLAUDE_SKILL_DIR}/scripts/repo-status.sh" .          # workspace containing the current directory
 ```
+
+The optional first positional argument limits the report to one workspace: `ws3`, `3`, `.` (the workspace containing `$PWD`) or any path inside a workspace. Errors (exit 2) if it doesn't resolve to a workspace. Flags may come before or after it. The zsh `repostatus` alias tab-completes workspace names (prefix first, then substring) and flags.
 
 Flags are forwarded to `ws-scan.sh` verbatim (it does the validation), so anything it accepts works here. Two exceptions: `--free` is rejected (this script's table needs `ws-scan.sh`'s `--report` output, always forced on), and `--no-tmux` is handled locally.
 
